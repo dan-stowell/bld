@@ -232,6 +232,36 @@ func getCrateWithFewestDependencies(dir string) (string, error) {
 	return crateWithFewestDependencies, nil
 }
 
+// getCargoTomlPath returns the path to the Cargo.toml file for a given crate name.
+func getCargoTomlPath(dir string, crateName string) (string, error) {
+	cargoCmd := exec.Command("cargo", "metadata", "--format-version", "1")
+	cargoCmd.Dir = dir
+	log.Printf("running command: %s %s", cargoCmd.Path, cargoCmd.Args)
+	cargoOutput, err := cargoCmd.Output()
+	if err != nil {
+		log.Printf("command %s failed: %v\n", cargoCmd.Path, err)
+		return "", fmt.Errorf("'cargo metadata' failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", cargoCmd.Path)
+
+	jqQuery := fmt.Sprintf(".packages[] | select(.name == \"%s\") | .manifest_path", crateName)
+	jqCmd := exec.Command("jq", "-r", jqQuery)
+	jqCmd.Stdin = bytes.NewReader(cargoOutput)
+	log.Printf("running command: %s %s", jqCmd.Path, jqCmd.Args)
+	jqOutput, err := jqCmd.Output()
+	if err != nil {
+		log.Printf("command %s failed: %v\n", jqCmd.Path, err)
+		return "", fmt.Errorf("'jq' failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", jqCmd.Path)
+
+	path := string(bytes.TrimSpace(jqOutput))
+	if path == "" {
+		return "", fmt.Errorf("Cargo.toml path not found for crate: %s", crateName)
+	}
+	return path, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
