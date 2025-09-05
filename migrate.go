@@ -382,6 +382,9 @@ func main() {
 	if err := createModuleFileIfNecessary(*wd); err != nil {
 		log.Fatalf("MODULE.bazel does not exist or could not be created: %s", err)
 	}
+	if err := createBuildFileIfNecessary(*wd); err != nil {
+		log.Fatalf("BUILD.bazel does not exist or could not be created: %s", err)
+	}
 	if err := addRulesRustDependencyIfNecessary(*wd); err != nil {
 		log.Fatalf("rules_rust module not present or could not be added: %s", err)
 	}
