@@ -491,4 +491,14 @@ func main() {
 	}
 
 	fmt.Printf("LLM Output:\n%s\n", string(llmOutput))
+
+	// Determine the BUILD.bazel file path
+	buildBazelFilePath := filepath.Join(filepath.Dir(cargoTomlPath), "BUILD.bazel")
+
+	// Write the LLM output to the BUILD.bazel file
+	err = os.WriteFile(buildBazelFilePath, llmOutput, 0644)
+	if err != nil {
+		log.Fatalf("error writing to BUILD.bazel file %s: %s", buildBazelFilePath, err)
+	}
+	fmt.Printf("Successfully wrote BUILD.bazel file to %s\n", buildBazelFilePath)
 }
