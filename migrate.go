@@ -47,11 +47,20 @@ func addRulesRustDependency(dir string) error {
 	}
 	defer f.Close()
 
-	dependency := fmt.Sprintf("\nbazel_dep(name = \"rules_rust\", version = \"%s\")\n", rulesRustVersion)
-	if _, err := f.WriteString(dependency); err != nil {
+	content := fmt.Sprintf(`
+bazel_dep(name = "rules_rust", version = "%s")
+
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "crates",
+    manifests = ["//:Cargo.toml"],
+)
+use_repo(crate, "crates")
+`, rulesRustVersion)
+	if _, err := f.WriteString(content); err != nil {
 		return fmt.Errorf("error writing to MODULE.bazel: %w", err)
 	}
-	log.Printf("Added rules_rust dependency to %s", moduleFilePath)
+	log.Printf("Added rules_rust dependency and crate_universe extension to %s", moduleFilePath)
 	return nil
 }
 
