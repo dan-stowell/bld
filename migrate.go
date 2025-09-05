@@ -543,4 +543,8 @@ func main() {
 		log.Fatalf("error running Bazel build in %s: %s", buildFileDir, err)
 	}
 	fmt.Printf("Bazel build successful for targets under //%s/...\n", relBuildFileDir)
-}
+
+	// Commit the BUILD.bazel file
+	if err := commitBuildFile(buildFileDir, fmt.Sprintf("feat: Add BUILD.bazel for %s crate", crate)); err != nil {
+		log.Fatalf("error committing BUILD.bazel file: %s", err)
+	}
