@@ -340,6 +340,17 @@ func createEmptyBuildFile(dir string) error {
 	return nil
 }
 
+func createBuildFileIfNecessary(dir string) error {
+	exists, err := buildFileExists(dir)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	return createEmptyBuildFile(dir)
+}
+
 func createModuleFileIfNecessary(dir string) error {
 	exists, err := bzlmodExists(dir)
 	if err != nil {
