@@ -193,14 +193,11 @@ func getRustCrateDependencies(dir string, crateName string) ([]string, error) {
 	log.Printf("command %s completed successfully.", cargoCmd.Path)
 
 	// The output of `cargo tree --prefix none` lists each dependency on a new line.
-	// The first line is the crate itself, so we skip it.
 	lines := bytes.Split(bytes.TrimSpace(cargoOutput), []byte("\n"))
 	result := make([]string, 0, len(lines))
-	if len(lines) > 1 { // Skip the first line which is the crate itself
-		for _, line := range lines[1:] {
-			if len(line) > 0 {
-				result = append(result, string(line))
-			}
+	for _, line := range lines {
+		if len(line) > 0 {
+			result = append(result, string(line))
 		}
 	}
 	return result, nil
