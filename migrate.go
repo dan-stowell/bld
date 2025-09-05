@@ -328,6 +328,18 @@ func buildFileExists(dir string) (bool, error) {
 	return false, nil
 }
 
+// createEmptyBuildFile creates an empty BUILD.bazel file in the given directory.
+func createEmptyBuildFile(dir string) error {
+	buildFilePath := filepath.Join(dir, "BUILD.bazel")
+	log.Printf("running os.Create on %s", buildFilePath)
+	file, err := os.Create(buildFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating BUILD.bazel: %w", err)
+	}
+	file.Close()
+	return nil
+}
+
 func createModuleFileIfNecessary(dir string) error {
 	exists, err := bzlmodExists(dir)
 	if err != nil {
