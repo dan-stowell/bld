@@ -492,8 +492,9 @@ func main() {
 
 	fmt.Printf("LLM Output:\n%s\n", string(llmOutput))
 
-	// Determine the BUILD.bazel file path
-	buildBazelFilePath := filepath.Join(filepath.Dir(cargoTomlPath), "BUILD.bazel")
+	// Determine the BUILD.bazel file path.
+	// cargoTomlPath is already relative to *wd, so we can directly use it to construct the buildBazelFilePath.
+	buildBazelFilePath := filepath.Join(*wd, filepath.Dir(cargoTomlPath), "BUILD.bazel")
 
 	// Write the LLM output to the BUILD.bazel file
 	err = os.WriteFile(buildBazelFilePath, llmOutput, 0644)
@@ -503,11 +504,14 @@ func main() {
 	fmt.Printf("Successfully wrote BUILD.bazel file to %s\n", buildBazelFilePath)
 
 	// Run bazel query on the directory of the new BUILD.bazel file
+	// buildFileDir should be the absolute path to the directory containing the BUILD.bazel file.
 	buildFileDir := filepath.Dir(buildBazelFilePath)
-	// Get the relative path of the buildFileDir from the working directory
+
+	// Get the relative path of the buildFileDir from the working directory.
+	// This will be used for the Bazel query.
 	relBuildFileDir, err := filepath.Rel(*wd, buildFileDir)
 	if err != nil {
-		log.Fatalf("error getting relative path for %s: %s", buildFileDir, err)
+		log.Fatalf("error getting relative path for %s from working directory %s: %s", buildFileDir, *wd, err)
 	}
 	// Construct the Bazel query to look for targets under the specific directory
 	query := fmt.Sprintf("//%s/...", relBuildFileDir)
