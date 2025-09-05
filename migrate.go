@@ -331,14 +331,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("error getting crate with fewest dependencies: %s", err)
 	}
-	if crate != "" {
-		fmt.Printf("Crate with fewest dependencies: %s\n", crate)
-		cargoTomlPath, err := getCargoTomlPath(*wd, crate)
-		if err != nil {
-			log.Fatalf("error getting Cargo.toml path for crate %s: %s", crate, err)
-		}
-		fmt.Printf("Relative path to Cargo.toml: %s\n", cargoTomlPath)
-	} else {
+	if crate == "" {
 		fmt.Println("No Rust crates found in the project.")
+		return
 	}
+
+	fmt.Printf("Crate with fewest dependencies: %s\n", crate)
+	cargoTomlPath, err := getCargoTomlPath(*wd, crate)
+	if err != nil {
+		log.Fatalf("error getting Cargo.toml path for crate %s: %s", crate, err)
+	}
+	fmt.Printf("Relative path to Cargo.toml: %s\n", cargoTomlPath)
 }
