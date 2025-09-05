@@ -275,6 +275,19 @@ func getCargoTomlPath(dir string, crateName string) (string, error) {
 	return relativePath, nil
 }
 
+// getFilesContent reads the content of the specified files and returns them as a map.
+func getFilesContent(filePaths []string) (map[string][]byte, error) {
+	contents := make(map[string][]byte)
+	for _, filePath := range filePaths {
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
+		}
+		contents[filePath] = content
+	}
+	return contents, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
