@@ -13,6 +13,7 @@ import (
 // bzlmodExists checks if MODULE.bazel exists in the given directory.
 func bzlmodExists(dir string) (bool, error) {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
+	log.Printf("running os.Stat on %s", moduleFilePath)
 	_, err := os.Stat(moduleFilePath)
 	if err == nil {
 		return true, nil
@@ -26,6 +27,7 @@ func bzlmodExists(dir string) (bool, error) {
 // createEmptyModuleFile creates an empty module.bazel file in the given directory.
 func createEmptyModuleFile(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
+	log.Printf("running os.Create on %s", moduleFilePath)
 	file, err := os.Create(moduleFilePath)
 	if err != nil {
 		return fmt.Errorf("error creating module.bazel: %w", err)
