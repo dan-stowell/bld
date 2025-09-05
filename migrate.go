@@ -203,6 +203,35 @@ func getRustCrateDependencies(dir string, crateName string) ([]string, error) {
 	return result, nil
 }
 
+// getCrateWithFewestDependencies returns the name of the crate with the fewest dependencies.
+func getCrateWithFewestDependencies(dir string) (string, error) {
+	crateNames, err := getRustCrateNames(dir)
+	if err != nil {
+		return "", fmt.Errorf("error getting Rust crate names: %w", err)
+	}
+
+	if len(crateNames) == 0 {
+		return "", nil // No crates found
+	}
+
+	minDependencies := -1
+	crateWithFewestDependencies := ""
+
+	for _, crateName := range crateNames {
+		dependencies, err := getRustCrateDependencies(dir, crateName)
+		if err != nil {
+			return "", fmt.Errorf("error getting dependencies for crate %s: %w", crateName, err)
+		}
+
+		numDependencies := len(dependencies)
+		if minDependencies == -1 || numDependencies < minDependencies {
+			minDependencies = numDependencies
+			crateWithFewestDependencies = crateName
+		}
+	}
+	return crateWithFewestDependencies, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
