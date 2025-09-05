@@ -549,3 +549,4 @@ func main() {
 	if err := commitBuildFile(buildBazelFilePath, fmt.Sprintf("feat: Add BUILD.bazel for %s crate", crate)); err != nil {
 		log.Fatalf("error committing BUILD.bazel file: %s", err)
 	}
+}
