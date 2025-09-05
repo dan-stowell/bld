@@ -96,7 +96,7 @@ func addRulesRustDependencyIfNecessary(dir string) error {
 	if !added {
 		return fmt.Errorf("adding rules_rust did not succeed")
 	}
-	return commitModuleFiles(dir)
+	return commitModuleFiles(dir, fmt.Sprintf("migration: add rules_rust@%s to MODULE.bazel", rulesRustVersion))
 }
 
 // runBazelQuery executes 'bazel query //...' and logs the number of targets.
@@ -120,7 +120,7 @@ func runBazelQuery(dir string) {
 }
 
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
-func commitModuleFiles(dir string) error {
+func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	moduleLockFilePath := filepath.Join(dir, "MODULE.bazel.lock")
 
@@ -133,7 +133,7 @@ func commitModuleFiles(dir string) error {
 	}
 	log.Printf("command %s completed successfully.", gitAddCmd.Path)
 
-	gitCommitCmd := exec.Command("git", "commit", "-m", "migration: add MODULE.bazel and MODULE.bazel.lock")
+	gitCommitCmd := exec.Command("git", "commit", "-m", message)
 	gitCommitCmd.Dir = dir // Set the working directory for the command
 	log.Printf("running command: %s %s", gitCommitCmd.Path, gitCommitCmd.Args)
 	if err := gitCommitCmd.Run(); err != nil {
@@ -162,7 +162,7 @@ func createModuleFileIfNecessary(dir string) error {
 	if _, err := runBazelModExplain(dir); err != nil {
 		return err
 	}
-	return commitModuleFiles(dir)
+	return commitModuleFiles(dir, "migration: add MODULE.bazel and MODULE.bazel.lock")
 }
 
 func main() {
