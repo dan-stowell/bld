@@ -111,7 +111,11 @@ func createModuleFileIfNecessary(dir string) error {
 }
 
 func main() {
-	wd := flag.String("wd", ".", "working directory")
+	defaultWd := os.Getenv("PWD")
+	if defaultWd == "" {
+		defaultWd = "."
+	}
+	wd := flag.String("wd", defaultWd, "working directory")
 	flag.Parse()
 
 	if err := createModuleFileIfNecessary(*wd); err != nil {
