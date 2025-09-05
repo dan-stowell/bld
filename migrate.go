@@ -119,6 +119,35 @@ func runBazelQuery(dir string) {
 	}
 }
 
+// hasBazelBuildTargets checks if there are any bazel build targets by running 'bazel query //...'.
+func hasBazelBuildTargets(dir string) (bool, error) {
+	queryCmd := exec.Command("bazel", "query", "//...")
+	queryCmd.Dir = dir // Set the working directory for the command
+	log.Printf("running command: %s %s", queryCmd.Path, queryCmd.Args)
+	queryOutput, err := queryCmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			// Bazel query returns non-zero exit code if no targets are found.
+			// We check stderr to differentiate between no targets and other errors.
+			if bytes.Contains(exitErr.Stderr, []byte("no targets found")) {
+				log.Printf("command %s completed successfully. found 0 targets.\n", queryCmd.Path)
+				return false, nil
+			}
+		}
+		log.Printf("command %s failed: %v\n", queryCmd.Path, err)
+		return false, fmt.Errorf("'bazel query //...' failed: %w", err)
+	}
+	numTargets := 0
+	if len(queryOutput) > 0 {
+		numTargets = len(bytes.Split(queryOutput, []byte("\n")))
+		if len(queryOutput) > 0 && queryOutput[len(queryOutput)-1] == '\n' {
+			numTargets--
+		}
+	}
+	log.Printf("command %s completed successfully. found %d targets.\n", queryCmd.Path, numTargets)
+	return numTargets > 0, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
