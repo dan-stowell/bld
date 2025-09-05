@@ -70,7 +70,7 @@ func runBazelQuery(dir string) {
 func commitModuleFiles(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	moduleLockFilePath := filepath.Join(dir, "MODULE.bazel.lock")
-	fmt.Printf("MODULE.bazel created and 'bazel mod graph' succeeded. Committing %s and %s...\n", moduleFilePath, moduleLockFilePath)
+	fmt.Printf("MODULE.bazel created and 'bazel mod explain' succeeded. Committing %s and %s...\n", moduleFilePath, moduleLockFilePath)
 
 	gitAddCmd := exec.Command("git", "add", moduleFilePath, moduleLockFilePath)
 	gitAddCmd.Dir = dir // Set the working directory for the command
