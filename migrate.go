@@ -340,6 +340,31 @@ func createEmptyBuildFile(dir string) error {
 	return nil
 }
 
+// commitBuildFile adds and commits BUILD.bazel.
+func commitBuildFile(dir string, message string) error {
+	buildFilePath := filepath.Join(dir, "BUILD.bazel")
+
+	gitAddCmd := exec.Command("git", "add", buildFilePath)
+	gitAddCmd.Dir = dir // Set the working directory for the command
+	log.Printf("running command: %s %s", gitAddCmd.Path, gitAddCmd.Args)
+	if err := gitAddCmd.Run(); err != nil {
+		log.Printf("command %s failed: %v", gitAddCmd.Path, err)
+		return fmt.Errorf("error adding %s to git: %w", buildFilePath, err)
+	}
+	log.Printf("command %s completed successfully.", gitAddCmd.Path)
+
+	gitCommitCmd := exec.Command("git", "commit", "-m", message)
+	gitCommitCmd.Dir = dir // Set the working directory for the command
+	log.Printf("running command: %s %s", gitCommitCmd.Path, gitCommitCmd.Args)
+	if err := gitCommitCmd.Run(); err != nil {
+		log.Printf("command %s failed: %v", gitCommitCmd.Path, err)
+		return fmt.Errorf("error committing %s: %w", buildFilePath, err)
+	}
+	log.Printf("command %s completed successfully.", gitCommitCmd.Path)
+	log.Printf("%s committed successfully.\n", buildFilePath)
+	return nil
+}
+
 func createBuildFileIfNecessary(dir string) error {
 	exists, err := buildFileExists(dir)
 	if err != nil {
@@ -348,7 +373,10 @@ func createBuildFileIfNecessary(dir string) error {
 	if exists {
 		return nil
 	}
-	return createEmptyBuildFile(dir)
+	if err := createEmptyBuildFile(dir); err != nil {
+		return err
+	}
+	return commitBuildFile(dir, "migration: add BUILD.bazel")
 }
 
 func createModuleFileIfNecessary(dir string) error {
