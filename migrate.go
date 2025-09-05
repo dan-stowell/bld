@@ -38,20 +38,22 @@ func main() {
 	}
 
 	if moduleFileCreated {
-		fmt.Printf("MODULE.bazel created and 'bazel mod graph' succeeded. Committing %s...\n", moduleFilePath)
-		gitAddCmd := exec.Command("git", "add", moduleFilePath)
+		moduleLockFilePath := filepath.Join(*wd, "MODULE.bazel.lock")
+		fmt.Printf("MODULE.bazel created and 'bazel mod graph' succeeded. Committing %s and %s...\n", moduleFilePath, moduleLockFilePath)
+
+		gitAddCmd := exec.Command("git", "add", moduleFilePath, moduleLockFilePath)
 		gitAddCmd.Dir = *wd // Set the working directory for the command
 		if err := gitAddCmd.Run(); err != nil {
-			fmt.Printf("Error adding %s to git: %v\n", moduleFilePath, err)
+			fmt.Printf("Error adding %s and %s to git: %v\n", moduleFilePath, moduleLockFilePath, err)
 			os.Exit(1)
 		}
-		gitCommitCmd := exec.Command("git", "commit", "-m", "feat: Add MODULE.bazel")
+		gitCommitCmd := exec.Command("git", "commit", "-m", "feat: Add MODULE.bazel and MODULE.bazel.lock")
 		gitCommitCmd.Dir = *wd // Set the working directory for the command
 		if err := gitCommitCmd.Run(); err != nil {
-			fmt.Printf("Error committing %s: %v\n", moduleFilePath, err)
+			fmt.Printf("Error committing %s and %s: %v\n", moduleFilePath, moduleLockFilePath, err)
 			os.Exit(1)
 		}
-		fmt.Printf("%s committed successfully.\n", moduleFilePath)
+		fmt.Printf("%s and %s committed successfully.\n", moduleFilePath, moduleLockFilePath)
 	}
 
 	os.Exit(0)
