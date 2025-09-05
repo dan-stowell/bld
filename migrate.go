@@ -485,7 +485,7 @@ func main() {
 		inputBuffer.WriteString("\n\n")
 	}
 
-	llmOutput, err := invokeLLM(prompt, *model, inputBuffer.Bytes(), []string{})
+	llmOutput, err := invokeLLM(prompt, *model, inputBuffer.Bytes(), []string{"-x"})
 	if err != nil {
 		log.Fatalf("error invoking LLM: %s", err)
 	}
