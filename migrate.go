@@ -128,9 +128,9 @@ func runBazelQuery(dir string) {
 	}
 }
 
-// hasBazelBuildTargets checks if there are any bazel build targets by running 'bazel query //...'.
-func hasBazelBuildTargets(dir string) (bool, error) {
-	queryCmd := exec.Command("bazel", "query", "//...")
+// hasBazelBuildTargets checks if there are any bazel build targets by running 'bazel query <query>'.
+func hasBazelBuildTargets(dir string, query string) (bool, error) {
+	queryCmd := exec.Command("bazel", "query", query)
 	queryCmd.Dir = dir // Set the working directory for the command
 	log.Printf("running command: %s %s", queryCmd.Path, queryCmd.Args)
 	queryOutput, err := queryCmd.Output()
@@ -504,12 +504,20 @@ func main() {
 
 	// Run bazel query on the directory of the new BUILD.bazel file
 	buildFileDir := filepath.Dir(buildBazelFilePath)
-	hasTargets, err := hasBazelBuildTargets(buildFileDir)
+	// Get the relative path of the buildFileDir from the working directory
+	relBuildFileDir, err := filepath.Rel(*wd, buildFileDir)
+	if err != nil {
+		log.Fatalf("error getting relative path for %s: %s", buildFileDir, err)
+	}
+	// Construct the Bazel query to look for targets under the specific directory
+	query := fmt.Sprintf("//%s/...", relBuildFileDir)
+
+	hasTargets, err := hasBazelBuildTargets(buildFileDir, query)
 	if err != nil {
 		log.Fatalf("error checking for Bazel build targets in %s: %s", buildFileDir, err)
 	}
 	if !hasTargets {
-		log.Fatalf("No Bazel build targets found in %s after writing BUILD.bazel. LLM might have generated an invalid BUILD.bazel file.", buildFileDir)
+		log.Fatalf("No Bazel build targets found under %s after writing BUILD.bazel. LLM might have generated an invalid BUILD.bazel file.", relBuildFileDir)
 	}
-	fmt.Printf("Bazel query successful. Found targets in %s.\n", buildFileDir)
+	fmt.Printf("Bazel query successful. Found targets under //%s/...\n", relBuildFileDir)
 }
