@@ -148,6 +148,38 @@ func hasBazelBuildTargets(dir string) (bool, error) {
 	return numTargets > 0, nil
 }
 
+// getRustCrateNames returns a list of Rust crate names by running 'cargo metadata' and parsing its output.
+func getRustCrateNames(dir string) ([]string, error) {
+	cargoCmd := exec.Command("cargo", "metadata", "--format-version", "1", "--no-deps")
+	cargoCmd.Dir = dir
+	log.Printf("running command: %s %s", cargoCmd.Path, cargoCmd.Args)
+	cargoOutput, err := cargoCmd.Output()
+	if err != nil {
+		log.Printf("command %s failed: %v\n", cargoCmd.Path, err)
+		return nil, fmt.Errorf("'cargo metadata' failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", cargoCmd.Path)
+
+	jqCmd := exec.Command("jq", "-r", ".packages[].name")
+	jqCmd.Stdin = bytes.NewReader(cargoOutput)
+	log.Printf("running command: %s %s", jqCmd.Path, jqCmd.Args)
+	jqOutput, err := jqCmd.Output()
+	if err != nil {
+		log.Printf("command %s failed: %v\n", jqCmd.Path, err)
+		return nil, fmt.Errorf("'jq' failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", jqCmd.Path)
+
+	names := bytes.Split(bytes.TrimSpace(jqOutput), []byte("\n"))
+	result := make([]string, 0, len(names))
+	for _, name := range names {
+		if len(name) > 0 {
+			result = append(result, string(name))
+		}
+	}
+	return result, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
