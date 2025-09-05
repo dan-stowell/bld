@@ -401,6 +401,19 @@ func commitBuildFile(dir string, message string) error {
 	return nil
 }
 
+// runBazelBuild executes 'bazel build <query>' in the given directory.
+func runBazelBuild(dir string, query string) error {
+	buildCmd := exec.Command("bazel", "build", query)
+	buildCmd.Dir = dir // Set the working directory for the command
+	log.Printf("running command: %s %s", buildCmd.Path, buildCmd.Args)
+	if err := buildCmd.Run(); err != nil {
+		log.Printf("command %s failed: %v", buildCmd.Path, err)
+		return fmt.Errorf("'bazel build' failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", buildCmd.Path)
+	return nil
+}
+
 func createBuildFileIfNecessary(dir string) error {
 	exists, err := buildFileExists(dir)
 	if err != nil {
@@ -524,4 +537,10 @@ func main() {
 		log.Fatalf("No Bazel build targets found under %s after writing BUILD.bazel. LLM might have generated an invalid BUILD.bazel file.", relBuildFileDir)
 	}
 	fmt.Printf("Bazel query successful. Found targets under //%s/...\n", relBuildFileDir)
+
+	// Run bazel build on the directory of the new BUILD.bazel file
+	if err := runBazelBuild(buildFileDir, query); err != nil {
+		log.Fatalf("error running Bazel build in %s: %s", buildFileDir, err)
+	}
+	fmt.Printf("Bazel build successful for targets under //%s/...\n", relBuildFileDir)
 }
