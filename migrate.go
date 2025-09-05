@@ -292,4 +292,14 @@ func main() {
 	if err := addRulesRustDependencyIfNecessary(*wd); err != nil {
 		log.Fatalf("rules_rust module not present or could not be added: %s", err)
 	}
+
+	crate, err := getCrateWithFewestDependencies(*wd)
+	if err != nil {
+		log.Fatalf("error getting crate with fewest dependencies: %s", err)
+	}
+	if crate != "" {
+		fmt.Printf("Crate with fewest dependencies: %s\n", crate)
+	} else {
+		fmt.Println("No Rust crates found in the project.")
+	}
 }
