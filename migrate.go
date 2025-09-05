@@ -34,15 +34,15 @@ func createEmptyModuleFile(dir string) error {
 	return nil
 }
 
-// runBazelModGraph executes 'bazel mod graph' in the given directory.
-func runBazelModGraph(dir string) error {
-	fmt.Println("Invoking 'bazel mod graph'...")
-	cmd := exec.Command("bazel", "mod", "graph")
+// runBazelModExplain executes 'bazel mod explain' in the given directory.
+func runBazelModExplain(dir string) error {
+	fmt.Println("Invoking 'bazel mod explain'...")
+	cmd := exec.Command("bazel", "mod", "explain")
 	cmd.Dir = dir // Set the working directory for the command
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("'bazel mod graph' failed: %w", err)
+		return fmt.Errorf("'bazel mod explain' failed: %w", err)
 	}
-	fmt.Println("'bazel mod graph' succeeded.")
+	fmt.Println("'bazel mod explain' succeeded.")
 	return nil
 }
 
@@ -104,7 +104,7 @@ func main() {
 		moduleFileCreated = true
 	}
 
-	if err := runBazelModGraph(*wd); err != nil {
+	if err := runBazelModExplain(*wd); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
