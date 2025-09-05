@@ -37,16 +37,26 @@ func createEmptyModuleFile(dir string) error {
 }
 
 // runBazelModExplain executes 'bazel mod explain' in the given directory.
-func runBazelModExplain(dir string) error {
+func runBazelModExplain(dir string) ([]byte, error) {
 	cmd := exec.Command("bazel", "mod", "explain")
 	cmd.Dir = dir // Set the working directory for the command
 	log.Printf("running command: %s %s", cmd.Path, cmd.Args)
-	if err := cmd.Run(); err != nil {
+	output, err := cmd.Output()
+	if err != nil {
 		log.Printf("command %s failed: %v", cmd.Path, err)
-		return fmt.Errorf("'bazel mod explain' failed: %w", err)
+		return nil, fmt.Errorf("'bazel mod explain' failed: %w", err)
 	}
 	log.Printf("command %s completed successfully.", cmd.Path)
-	return nil
+	return output, nil
+}
+
+// rulesRustExists checks if the rules_rust module is present by running 'bazel mod explain'.
+func rulesRustExists(dir string) (bool, error) {
+	output, err := runBazelModExplain(dir)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Contains(output, []byte("rules_rust")), nil
 }
 
 // runBazelQuery executes 'bazel query //...' and logs the number of targets.
@@ -101,7 +111,7 @@ func createModuleFileIfNecessary(dir string) error {
 		return err
 	}
 	if exists {
-		if err := runBazelModExplain(dir); err != nil {
+		if _, err := runBazelModExplain(dir); err != nil {
 			return err
 		}
 		return nil
@@ -109,7 +119,7 @@ func createModuleFileIfNecessary(dir string) error {
 	if err := createEmptyModuleFile(dir); err != nil {
 		return err
 	}
-	if err := runBazelModExplain(dir); err != nil {
+	if _, err := runBazelModExplain(dir); err != nil {
 		return err
 	}
 	if err := commitModuleFiles(dir); err != nil {
