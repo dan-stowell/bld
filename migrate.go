@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -114,7 +115,6 @@ func main() {
 	flag.Parse()
 
 	if err := createModuleFileIfNecessary(*wd); err != nil {
-		fmt.Fatalf("error creating MODULE.bazel file if necessary: %s", err)
-		return
+		log.Fatalf("error creating MODULE.bazel file if necessary: %s", err)
 	}
 }
