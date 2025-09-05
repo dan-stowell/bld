@@ -439,6 +439,7 @@ func main() {
 		defaultWd = "."
 	}
 	wd := flag.String("wd", defaultWd, "working directory")
+	model := flag.String("model", "openrouter/google/gemini-2.5-flash", "LLM model to use")
 	flag.Parse()
 
 	if err := createModuleFileIfNecessary(*wd); err != nil {
@@ -482,7 +483,7 @@ func main() {
 		inputBuffer.WriteString("\n\n")
 	}
 
-	llmOutput, err := invokeLLM(prompt, "mistral-7b-instruct", inputBuffer.Bytes())
+	llmOutput, err := invokeLLM(prompt, *model, inputBuffer.Bytes())
 	if err != nil {
 		log.Fatalf("error invoking LLM: %s", err)
 	}
