@@ -466,4 +466,26 @@ func main() {
 		log.Fatalf("error getting Cargo.toml path for crate %s: %s", crate, err)
 	}
 	fmt.Printf("Relative path to Cargo.toml: %s\n", cargoTomlPath)
+
+	moduleBazelPath := filepath.Join(*wd, "MODULE.bazel")
+	filePaths := []string{cargoTomlPath, moduleBazelPath}
+	fileContents, err := getFilesContent(filePaths)
+	if err != nil {
+		log.Fatalf("error getting file contents: %s", err)
+	}
+
+	prompt := fmt.Sprintf("What is the minimal BUILD.bazel file that will build the %s crate using Bazel? Please print just the BUILD.bazel file", crate)
+	var inputBuffer bytes.Buffer
+	for _, filePath := range filePaths {
+		inputBuffer.WriteString(fmt.Sprintf("--- %s ---\n", filePath))
+		inputBuffer.Write(fileContents[filePath])
+		inputBuffer.WriteString("\n\n")
+	}
+
+	llmOutput, err := invokeLLM(prompt, "mistral-7b-instruct", inputBuffer.Bytes())
+	if err != nil {
+		log.Fatalf("error invoking LLM: %s", err)
+	}
+
+	fmt.Printf("LLM Output:\n%s\n", string(llmOutput))
 }
