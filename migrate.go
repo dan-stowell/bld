@@ -353,6 +353,27 @@ func createEmptyBuildFile(dir string) error {
 	return nil
 }
 
+// invokeLLM invokes the llm tool with the given prompt, model, and input buffer.
+func invokeLLM(prompt, model string, inputBuffer []byte) ([]byte, error) {
+	cmd := exec.Command("llm", "-m", model, "-s", prompt)
+	cmd.Stdin = bytes.NewReader(inputBuffer)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "OPENROUTER_API_KEY="+os.Getenv("OPENROUTER_API_KEY"))
+	cmd.Env = append(cmd.Env, "OPENROUTER_KEY="+os.Getenv("OPENROUTER_KEY"))
+
+	log.Printf("running command: %s %s", cmd.Path, cmd.Args)
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			log.Printf("command %s failed with stderr: %s", cmd.Path, exitErr.Stderr)
+		}
+		log.Printf("command %s failed: %v", cmd.Path, err)
+		return nil, fmt.Errorf("'llm' command failed: %w", err)
+	}
+	log.Printf("command %s completed successfully.", cmd.Path)
+	return output, nil
+}
+
 // commitBuildFile adds and commits BUILD.bazel.
 func commitBuildFile(dir string, message string) error {
 	buildFilePath := filepath.Join(dir, "BUILD.bazel")
