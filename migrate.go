@@ -21,16 +21,16 @@ func bzlmodExists(dir string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return false, fmt.Errorf("error checking for module.bazel: %w", err)
+	return false, fmt.Errorf("error checking for MODULE.bazel: %w", err)
 }
 
-// createEmptyModuleFile creates an empty module.bazel file in the given directory.
+// createEmptyModuleFile creates an empty MODULE.bazel file in the given directory.
 func createEmptyModuleFile(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	log.Printf("running os.Create on %s", moduleFilePath)
 	file, err := os.Create(moduleFilePath)
 	if err != nil {
-		return fmt.Errorf("error creating module.bazel: %w", err)
+		return fmt.Errorf("error creating MODULE.bazel: %w", err)
 	}
 	file.Close()
 	return nil
@@ -69,7 +69,7 @@ func runBazelQuery(dir string) {
 	}
 }
 
-// commitModuleFiles adds and commits module.bazel and module.bazel.lock.
+// commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	moduleLockFilePath := filepath.Join(dir, "MODULE.bazel.lock")
@@ -83,7 +83,7 @@ func commitModuleFiles(dir string) error {
 	}
 	log.Printf("command %s completed successfully.", gitAddCmd.Path)
 
-	gitCommitCmd := exec.Command("git", "commit", "-m", "feat: add module.bazel and module.bazel.lock")
+	gitCommitCmd := exec.Command("git", "commit", "-m", "migration: add MODULE.bazel and MODULE.bazel.lock")
 	gitCommitCmd.Dir = dir // Set the working directory for the command
 	log.Printf("running command: %s %s", gitCommitCmd.Path, gitCommitCmd.Args)
 	if err := gitCommitCmd.Run(); err != nil {
@@ -127,6 +127,6 @@ func main() {
 	flag.Parse()
 
 	if err := createModuleFileIfNecessary(*wd); err != nil {
-		log.Fatalf("error creating module.bazel file if necessary: %s", err)
+		log.Fatalf("error creating MODULE.bazel file if necessary: %s", err)
 	}
 }
