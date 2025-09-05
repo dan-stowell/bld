@@ -376,9 +376,10 @@ func invokeLLM(prompt, model string, inputBuffer []byte, extraArgs []string) ([]
 	return output, nil
 }
 
-// commitBuildFile adds and commits BUILD.bazel.
-func commitBuildFile(dir string, message string) error {
-	buildFilePath := filepath.Join(dir, "BUILD.bazel")
+// commitBuildFile adds and commits a specific BUILD.bazel file.
+func commitBuildFile(buildFilePath string, message string) error {
+	// Get the directory containing the BUILD.bazel file
+	dir := filepath.Dir(buildFilePath)
 
 	gitAddCmd := exec.Command("git", "add", buildFilePath)
 	gitAddCmd.Dir = dir // Set the working directory for the command
@@ -425,7 +426,7 @@ func createBuildFileIfNecessary(dir string) error {
 	if err := createEmptyBuildFile(dir); err != nil {
 		return err
 	}
-	return commitBuildFile(dir, "migration: add BUILD.bazel")
+	return commitBuildFile(filepath.Join(dir, "BUILD.bazel"), "migration: add BUILD.bazel")
 }
 
 func createModuleFileIfNecessary(dir string) error {
@@ -545,6 +546,6 @@ func main() {
 	fmt.Printf("Bazel build successful for targets under //%s/...\n", relBuildFileDir)
 
 	// Commit the BUILD.bazel file
-	if err := commitBuildFile(buildFileDir, fmt.Sprintf("feat: Add BUILD.bazel for %s crate", crate)); err != nil {
+	if err := commitBuildFile(buildBazelFilePath, fmt.Sprintf("feat: Add BUILD.bazel for %s crate", crate)); err != nil {
 		log.Fatalf("error committing BUILD.bazel file: %s", err)
 	}
