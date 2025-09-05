@@ -301,6 +301,33 @@ func commitModuleFiles(dir string, message string) error {
 	return nil
 }
 
+// buildFileExists checks if a BUILD.bazel or BUILD file exists in the given directory.
+func buildFileExists(dir string) (bool, error) {
+	buildBazelPath := filepath.Join(dir, "BUILD.bazel")
+	buildPath := filepath.Join(dir, "BUILD")
+
+	_, errBazel := os.Stat(buildBazelPath)
+	if errBazel == nil {
+		log.Printf("Found BUILD.bazel at %s", buildBazelPath)
+		return true, nil
+	}
+	if !os.IsNotExist(errBazel) {
+		return false, fmt.Errorf("error checking for BUILD.bazel: %w", errBazel)
+	}
+
+	_, errBuild := os.Stat(buildPath)
+	if errBuild == nil {
+		log.Printf("Found BUILD at %s", buildPath)
+		return true, nil
+	}
+	if !os.IsNotExist(errBuild) {
+		return false, fmt.Errorf("error checking for BUILD: %w", errBuild)
+	}
+
+	log.Printf("No BUILD.bazel or BUILD file found in %s", dir)
+	return false, nil
+}
+
 func createModuleFileIfNecessary(dir string) error {
 	exists, err := bzlmodExists(dir)
 	if err != nil {
