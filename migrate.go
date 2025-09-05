@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 const rulesRustVersion = "0.64.0"
@@ -79,6 +78,27 @@ func rulesRustExists(dir string) (bool, error) {
 	return bytes.Contains(output, []byte("rules_rust")), nil
 }
 
+func addRulesRustDependencyIfNecessary(dir string) error {
+	exists, err := rulesRustExists(dir)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if err := addRulesRustDependency(dir); err != nil {
+		return err
+	}
+	added, err := rulesRustExists(dir)
+	if err != nil {
+		return err
+	}
+	if !added {
+		return fmt.Errorf("adding rules_rust did not succeed")
+	}
+	return commitModuleFiles(dir)
+}
+
 // runBazelQuery executes 'bazel query //...' and logs the number of targets.
 func runBazelQuery(dir string) {
 	queryCmd := exec.Command("bazel", "query", "//...")
@@ -142,10 +162,7 @@ func createModuleFileIfNecessary(dir string) error {
 	if _, err := runBazelModExplain(dir); err != nil {
 		return err
 	}
-	if err := commitModuleFiles(dir); err != nil {
-		return err
-	}
-	return nil
+	return commitModuleFiles(dir)
 }
 
 func main() {
@@ -157,6 +174,9 @@ func main() {
 	flag.Parse()
 
 	if err := createModuleFileIfNecessary(*wd); err != nil {
-		log.Fatalf("error creating MODULE.bazel file if necessary: %s", err)
+		log.Fatalf("MODULE.bazel does not exist or could not be created: %s", err)
+	}
+	if err := addRulesRustDependencyIfNecessary(*wd); err != nil {
+		log.Fatalf("rules_rust module not present or could not be added: %s", err)
 	}
 }
