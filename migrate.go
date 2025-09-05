@@ -8,7 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
+
+const rulesRustVersion = "0.64.0"
 
 // bzlmodExists checks if MODULE.bazel exists in the given directory.
 func bzlmodExists(dir string) (bool, error) {
@@ -33,6 +36,23 @@ func createEmptyModuleFile(dir string) error {
 		return fmt.Errorf("error creating MODULE.bazel: %w", err)
 	}
 	file.Close()
+	return nil
+}
+
+// addRulesRustDependency adds the bazel_dep for rules_rust to MODULE.bazel.
+func addRulesRustDependency(dir string) error {
+	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
+	f, err := os.OpenFile(moduleFilePath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening MODULE.bazel: %w", err)
+	}
+	defer f.Close()
+
+	dependency := fmt.Sprintf("\nbazel_dep(name = \"rules_rust\", version = \"%s\")\n", rulesRustVersion)
+	if _, err := f.WriteString(dependency); err != nil {
+		return fmt.Errorf("error writing to MODULE.bazel: %w", err)
+	}
+	log.Printf("Added rules_rust dependency to %s", moduleFilePath)
 	return nil
 }
 
