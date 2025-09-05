@@ -180,6 +180,32 @@ func getRustCrateNames(dir string) ([]string, error) {
 	return result, nil
 }
 
+// getRustCrateDependencies returns a list of dependency names for a given crate by running 'cargo tree'.
+func getRustCrateDependencies(dir string, crateName string) ([]string, error) {
+	cargoCmd := exec.Command("cargo", "tree", "--package", crateName, "--prefix", "none")
+	cargoCmd.Dir = dir
+	log.Printf("running command: %s %s", cargoCmd.Path, cargoCmd.Args)
+	cargoOutput, err := cargoCmd.Output()
+	if err != nil {
+		log.Printf("command %s failed: %v\n", cargoCmd.Path, err)
+		return nil, fmt.Errorf("'cargo tree' failed for crate %s: %w", crateName, err)
+	}
+	log.Printf("command %s completed successfully.", cargoCmd.Path)
+
+	// The output of `cargo tree --prefix none` lists each dependency on a new line.
+	// The first line is the crate itself, so we skip it.
+	lines := bytes.Split(bytes.TrimSpace(cargoOutput), []byte("\n"))
+	result := make([]string, 0, len(lines))
+	if len(lines) > 1 { // Skip the first line which is the crate itself
+		for _, line := range lines[1:] {
+			if len(line) > 0 {
+				result = append(result, string(line))
+			}
+		}
+	}
+	return result, nil
+}
+
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
 func commitModuleFiles(dir string, message string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
