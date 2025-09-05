@@ -501,4 +501,15 @@ func main() {
 		log.Fatalf("error writing to BUILD.bazel file %s: %s", buildBazelFilePath, err)
 	}
 	fmt.Printf("Successfully wrote BUILD.bazel file to %s\n", buildBazelFilePath)
+
+	// Run bazel query on the directory of the new BUILD.bazel file
+	buildFileDir := filepath.Dir(buildBazelFilePath)
+	hasTargets, err := hasBazelBuildTargets(buildFileDir)
+	if err != nil {
+		log.Fatalf("error checking for Bazel build targets in %s: %s", buildFileDir, err)
+	}
+	if !hasTargets {
+		log.Fatalf("No Bazel build targets found in %s after writing BUILD.bazel. LLM might have generated an invalid BUILD.bazel file.", buildFileDir)
+	}
+	fmt.Printf("Bazel query successful. Found targets in %s.\n", buildFileDir)
 }
