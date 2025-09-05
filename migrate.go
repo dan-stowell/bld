@@ -37,24 +37,25 @@ func createEmptyModuleFile(dir string) error {
 
 // runBazelModExplain executes 'bazel mod explain' in the given directory.
 func runBazelModExplain(dir string) error {
-	log.Println("Invoking 'bazel mod explain'...")
 	cmd := exec.Command("bazel", "mod", "explain")
 	cmd.Dir = dir // Set the working directory for the command
+	log.Printf("Running command: %s %s", cmd.Path, cmd.Args)
 	if err := cmd.Run(); err != nil {
+		log.Printf("Command failed: %v", err)
 		return fmt.Errorf("'bazel mod explain' failed: %w", err)
 	}
-	log.Println("'bazel mod explain' succeeded.")
+	log.Println("Command completed successfully.")
 	return nil
 }
 
 // runBazelQuery executes 'bazel query //...' and logs the number of targets.
 func runBazelQuery(dir string) {
-	log.Println("Invoking 'bazel query //...'...")
 	queryCmd := exec.Command("bazel", "query", "//...")
 	queryCmd.Dir = dir // Set the working directory for the command
+	log.Printf("Running command: %s %s", queryCmd.Path, queryCmd.Args)
 	queryOutput, err := queryCmd.Output()
 	if err != nil {
-		log.Printf("'bazel query //...' failed: %v\n", err)
+		log.Printf("Command failed: %v\n", err)
 	} else {
 		numTargets := 0
 		if len(queryOutput) > 0 {
@@ -63,7 +64,7 @@ func runBazelQuery(dir string) {
 				numTargets--
 			}
 		}
-		log.Printf("'bazel query //...' succeeded. Found %d targets.\n", numTargets)
+		log.Printf("Command completed successfully. Found %d targets.\n", numTargets)
 	}
 }
 
@@ -71,18 +72,25 @@ func runBazelQuery(dir string) {
 func commitModuleFiles(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	moduleLockFilePath := filepath.Join(dir, "MODULE.bazel.lock")
-	log.Printf("MODULE.bazel created and 'bazel mod explain' succeeded. Committing %s and %s...\n", moduleFilePath, moduleLockFilePath)
+	log.Printf("Committing %s and %s...", moduleFilePath, moduleLockFilePath)
 
 	gitAddCmd := exec.Command("git", "add", moduleFilePath, moduleLockFilePath)
 	gitAddCmd.Dir = dir // Set the working directory for the command
+	log.Printf("Running command: %s %s", gitAddCmd.Path, gitAddCmd.Args)
 	if err := gitAddCmd.Run(); err != nil {
+		log.Printf("Command failed: %v", err)
 		return fmt.Errorf("error adding %s and %s to git: %w", moduleFilePath, moduleLockFilePath, err)
 	}
+	log.Println("Command completed successfully.")
+
 	gitCommitCmd := exec.Command("git", "commit", "-m", "feat: Add MODULE.bazel and MODULE.bazel.lock")
 	gitCommitCmd.Dir = dir // Set the working directory for the command
+	log.Printf("Running command: %s %s", gitCommitCmd.Path, gitCommitCmd.Args)
 	if err := gitCommitCmd.Run(); err != nil {
+		log.Printf("Command failed: %v", err)
 		return fmt.Errorf("error committing %s and %s: %w", moduleFilePath, moduleLockFilePath, err)
 	}
+	log.Println("Command completed successfully.")
 	log.Printf("%s and %s committed successfully.\n", moduleFilePath, moduleLockFilePath)
 	return nil
 }
