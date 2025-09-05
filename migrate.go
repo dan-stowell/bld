@@ -86,37 +86,35 @@ func commitModuleFiles(dir string) error {
 	return nil
 }
 
+func createModuleFileIfNecessary(dir string) error {
+	exists, err := bzlmodExists(dir)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := runBazelModExplain(dir); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := createEmptyModuleFile(dir); err != nil {
+		return err
+	}
+	if err := runBazelModExplain(dir); err != nil {
+		return err
+	}
+	if err := commitModuleFiles(dir); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	wd := flag.String("wd", ".", "working directory")
 	flag.Parse()
 
-	moduleFileCreated := false
-	exists, err := bzlmodExists(*wd)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if err := createModuleFileIfNecessary(*wd); err != nil {
+		fmt.Fatalf("error creating MODULE.bazel file if necessary: %s", err)
+		return
 	}
-	if !exists {
-		if err := createEmptyModuleFile(*wd); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		moduleFileCreated = true
-	}
-
-	if err := runBazelModExplain(*wd); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	runBazelQuery(*wd)
-
-	if moduleFileCreated {
-		if err := commitModuleFiles(*wd); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-	}
-
-	os.Exit(0)
 }
