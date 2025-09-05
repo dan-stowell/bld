@@ -26,7 +26,6 @@ func bzlmodExists(dir string) (bool, error) {
 // createEmptyModuleFile creates an empty MODULE.bazel file in the given directory.
 func createEmptyModuleFile(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
-	log.Printf("MODULE.bazel not found in %s. Creating an empty %s\n", dir, moduleFilePath)
 	file, err := os.Create(moduleFilePath)
 	if err != nil {
 		return fmt.Errorf("error creating MODULE.bazel: %w", err)
@@ -72,7 +71,6 @@ func runBazelQuery(dir string) {
 func commitModuleFiles(dir string) error {
 	moduleFilePath := filepath.Join(dir, "MODULE.bazel")
 	moduleLockFilePath := filepath.Join(dir, "MODULE.bazel.lock")
-	log.Printf("Committing %s and %s...", moduleFilePath, moduleLockFilePath)
 
 	gitAddCmd := exec.Command("git", "add", moduleFilePath, moduleLockFilePath)
 	gitAddCmd.Dir = dir // Set the working directory for the command
