@@ -353,9 +353,11 @@ func createEmptyBuildFile(dir string) error {
 	return nil
 }
 
-// invokeLLM invokes the llm tool with the given prompt, model, and input buffer.
-func invokeLLM(prompt, model string, inputBuffer []byte) ([]byte, error) {
-	cmd := exec.Command("llm", "-m", model, "-s", prompt)
+// invokeLLM invokes the llm tool with the given prompt, model, input buffer, and extra arguments.
+func invokeLLM(prompt, model string, inputBuffer []byte, extraArgs []string) ([]byte, error) {
+	args := []string{"-m", model, "-s", prompt}
+	args = append(args, extraArgs...)
+	cmd := exec.Command("llm", args...)
 	cmd.Stdin = bytes.NewReader(inputBuffer)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "OPENROUTER_API_KEY="+os.Getenv("OPENROUTER_API_KEY"))
@@ -483,7 +485,7 @@ func main() {
 		inputBuffer.WriteString("\n\n")
 	}
 
-	llmOutput, err := invokeLLM(prompt, *model, inputBuffer.Bytes())
+	llmOutput, err := invokeLLM(prompt, *model, inputBuffer.Bytes(), []string{})
 	if err != nil {
 		log.Fatalf("error invoking LLM: %s", err)
 	}
