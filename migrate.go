@@ -34,7 +34,29 @@ func main() {
 	// We don't care about the output, just the success/failure
 	err := cmd.Run()
 	if err != nil {
+		fmt.Printf("'bazel mod graph' failed: %v\n", err)
 		os.Exit(1)
+	}
+	fmt.Println("'bazel mod graph' succeeded.")
+
+	// Invoke 'bazel query //...'
+	fmt.Println("Invoking 'bazel query //...'...")
+	queryCmd := exec.Command("bazel", "query", "//...")
+	queryCmd.Dir = *wd // Set the working directory for the command
+	queryOutput, err := queryCmd.Output()
+	if err != nil {
+		fmt.Printf("'bazel query //...' failed: %v\n", err)
+	} else {
+		// Count the number of lines (targets)
+		numTargets := 0
+		if len(queryOutput) > 0 {
+			numTargets = len(bytes.Split(queryOutput, []byte("\n")))
+			// Adjust for potential trailing newline creating an empty last element
+			if len(queryOutput) > 0 && queryOutput[len(queryOutput)-1] == '\n' {
+				numTargets--
+			}
+		}
+		fmt.Printf("'bazel query //...' succeeded. Found %d targets.\n", numTargets)
 	}
 
 	if moduleFileCreated {
