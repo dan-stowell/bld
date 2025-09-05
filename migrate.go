@@ -23,13 +23,10 @@ func main() {
 	// Invoke 'bazel mod graph'
 	fmt.Println("Invoking 'bazel mod graph'...")
 	cmd := exec.Command("bazel", "mod", "graph")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// We don't care about the output, just the success/failure
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("Error running 'bazel mod graph': %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Println("'bazel mod graph' completed successfully.")
+	os.Exit(0)
 }
