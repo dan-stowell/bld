@@ -259,7 +259,11 @@ func getCargoTomlPath(dir string, crateName string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("Cargo.toml path not found for crate: %s", crateName)
 	}
-	return path, nil
+	relativePath, err := filepath.Rel(dir, path)
+	if err != nil {
+		return "", fmt.Errorf("error getting relative path for %s: %w", path, err)
+	}
+	return relativePath, nil
 }
 
 // commitModuleFiles adds and commits MODULE.bazel and MODULE.bazel.lock.
