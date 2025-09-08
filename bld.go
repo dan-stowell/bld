@@ -10,21 +10,17 @@ import (
 )
 
 var models = []string{
-	"openrouter/anthropic/claude-2",
-	"openrouter/anthropic/claude-3-5-haiku",
-	"openrouter/anthropic/claude-3-5-haiku-20241022",
-	"openrouter/anthropic/claude-3-haiku",
-	"openrouter/anthropic/claude-3-haiku-20240307",
-	"openrouter/anthropic/claude-3-opus",
-	"openrouter/anthropic/claude-3-sonnet",
-	"openrouter/anthropic/claude-3.5-sonnet",
-	"openrouter/anthropic/claude-3.5-sonnet:beta",
-	"openrouter/anthropic/claude-3.7-sonnet",
-	"openrouter/anthropic/claude-3.7-sonnet:beta",
-	"openrouter/anthropic/claude-instant-v1",
-	"openrouter/anthropic/claude-opus-4",
-	"openrouter/anthropic/claude-opus-4.1",
-	"openrouter/anthropic/claude-sonnet-4",
+	// openrouter top 10 programming weekly as of 2025-09-08
+	"x-ai/grok-code-fast-1",
+	"anthropic/claude-sonnet-4",
+	"google/gemini-2.5-flash",
+	"openai/gpt-4.1-mini",
+	"google/gemini-2.5-pro",
+	"openai/gpt-5",
+	"qwen/qwen3-coder",
+	"openrouter/sonoma-sky-alpha",
+	"deepseek/deepseek-chat-v3.1",
+	"x-ai/grok-4",
 }
 
 // sanitizePath replaces characters that are unsafe in file paths with hyphens.
@@ -124,7 +120,7 @@ func main() {
 	worktreeBaseDir := filepath.Join(homeDir, "worktree")
 
 	for _, model := range models {
-		sanitizedModelName := sanitizePath(model)
+		sanitizedModelName := sanitizePath("openrouter/" + model)
 		modelBranch := branch + "-" + sanitizedModelName
 		worktreePath := filepath.Join(worktreeBaseDir, modelBranch)
 
