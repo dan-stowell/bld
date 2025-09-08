@@ -210,9 +210,10 @@ func ensureBuildBazelExists(worktreePath, target string) error {
 	return nil
 }
 
-func gitStashAll(worktreePath string) error {
+func gitStashAll(worktreePath, target string) error {
 	// Stash untracked and dirty files so the next aider invocation starts clean.
-	stashCmd := exec.Command("git", "stash", "push", "-u", "-m", "aider-temp-stash")
+	stashMsg := fmt.Sprintf("aider-temp-stash target %s", target)
+	stashCmd := exec.Command("git", "stash", "push", "-u", "-m", stashMsg)
 	stashCmd.Dir = worktreePath
 	out, err := stashCmd.CombinedOutput()
 	if err != nil {
@@ -291,7 +292,7 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 		if queryErr != nil {
 			log.Printf("bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
 			// Stash any untracked or dirty files and retry with aider.
-			if err := gitStashAll(worktreePath); err != nil {
+			if err := gitStashAll(worktreePath, target); err != nil {
 				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
 			}
 			log.Printf("Re-invoking aider for model %s target %s after failed bazel query (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
@@ -305,7 +306,7 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 		if bazelErr != nil {
 			log.Printf("bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
 			// Stash any untracked or dirty files and retry with aider.
-			if err := gitStashAll(worktreePath); err != nil {
+			if err := gitStashAll(worktreePath, target); err != nil {
 				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
 			}
 			log.Printf("Re-invoking aider for model %s target %s after failed bazel build (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
