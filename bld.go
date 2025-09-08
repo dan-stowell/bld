@@ -265,6 +265,7 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		aiderCmd := exec.Command(
 			"aider",
+			"--no-auto-commits",
 			"--disable-playwright",
 			"--yes-always",
 			"--model", llmModel,
