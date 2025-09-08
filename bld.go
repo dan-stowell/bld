@@ -214,53 +214,72 @@ func main() {
 		// minimal Bazel changes to build the target.
 		llmModel := "openrouter/" + model
 		for _, target := range targets {
-			aiderCmd := exec.Command(
-				"aider",
-				"--disable-playwright",
-				"--yes-always",
-				"--model", llmModel,
-				"--edit-format", "diff",
-				"--auto-test",
-				"--test-cmd", "bazel build "+target,
-				"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
-			)
-			aiderCmd.Dir = worktreePath
-			aiderCmd.Stdout = os.Stdout
-			aiderCmd.Stderr = os.Stderr
-			if err := aiderCmd.Run(); err != nil {
-				log.Fatalf("aider failed for model %s target %s: %v", llmModel, target, err)
-			}
-			log.Printf("aider succeeded for model %s target %s", llmModel, target)
+			for {
+				aiderCmd := exec.Command(
+					"aider",
+					"--disable-playwright",
+					"--yes-always",
+					"--model", llmModel,
+					"--edit-format", "diff",
+					"--auto-test",
+					"--test-cmd", "bazel build "+target,
+					"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
+				)
+				aiderCmd.Dir = worktreePath
+				aiderCmd.Stdout = os.Stdout
+				aiderCmd.Stderr = os.Stderr
+				if err := aiderCmd.Run(); err != nil {
+					log.Fatalf("aider failed for model %s target %s: %v", llmModel, target, err)
+				}
+				log.Printf("aider succeeded for model %s target %s", llmModel, target)
 
-			// Stage all changes produced by aider (including untracked files).
-			addCmd := exec.Command("git", "add", "-A")
-			addCmd.Dir = worktreePath
-			if out, err := addCmd.CombinedOutput(); err != nil {
-				log.Fatalf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
-			}
+				// Stage all changes produced by aider (including untracked files).
+				addCmd := exec.Command("git", "add", "-A")
+				addCmd.Dir = worktreePath
+				if out, err := addCmd.CombinedOutput(); err != nil {
+					log.Fatalf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
+				}
 
-			// Check if there is anything to commit.
-			statusCmd := exec.Command("git", "status", "--porcelain")
-			statusCmd.Dir = worktreePath
-			statusOut, err := statusCmd.Output()
-			if err != nil {
-				log.Fatalf("git status failed in %s: %v", worktreePath, err)
-			}
-			if strings.TrimSpace(string(statusOut)) == "" {
-				log.Printf("No changes to commit in %s for model %s target %s", worktreePath, llmModel, target)
-				continue
-			}
+				// Check if there is anything to commit.
+				statusCmd := exec.Command("git", "status", "--porcelain")
+				statusCmd.Dir = worktreePath
+				statusOut, err := statusCmd.Output()
+				if err != nil {
+					log.Fatalf("git status failed in %s: %v", worktreePath, err)
+				}
+				if strings.TrimSpace(string(statusOut)) == "" {
+					log.Printf("No changes to commit in %s for model %s target %s", worktreePath, llmModel, target)
+				} else {
+					// Commit staged changes.
+					commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
+					commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+					commitCmd.Dir = worktreePath
+					commitCmd.Stdout = os.Stdout
+					commitCmd.Stderr = os.Stderr
+					if err := commitCmd.Run(); err != nil {
+						log.Fatalf("git commit failed in %s: %v", worktreePath, err)
+					}
+					log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
+				}
 
-			// Commit staged changes.
-			commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
-			commitCmd := exec.Command("git", "commit", "-m", commitMsg)
-			commitCmd.Dir = worktreePath
-			commitCmd.Stdout = os.Stdout
-			commitCmd.Stderr = os.Stderr
-			if err := commitCmd.Run(); err != nil {
-				log.Fatalf("git commit failed in %s: %v", worktreePath, err)
+				// Run bazel build for the target.
+				bazelCmd := exec.Command("bazel", "build", target)
+				bazelCmd.Dir = worktreePath
+				bazelOut, err := bazelCmd.CombinedOutput()
+				if err == nil {
+					log.Printf("bazel build succeeded for model %s target %s", llmModel, target)
+					break // move to next target
+				}
+
+				// Build failed. If no changes were produced by aider this is unrecoverable.
+				log.Printf("bazel build failed for model %s target %s: %v\n%s", llmModel, target, err, string(bazelOut))
+				if strings.TrimSpace(string(statusOut)) == "" {
+					log.Fatalf("No changes were produced by aider and bazel build failed for target %s; aborting", target)
+				}
+
+				// Otherwise, loop to invoke aider again to attempt further fixes.
+				log.Printf("Re-invoking aider for model %s target %s after failed bazel build", llmModel, target)
 			}
-			log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
 		}
 	}
 }
