@@ -175,22 +175,10 @@ func runFilesToPrompt(worktreePath, targetDir string) (string, error) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: bld <target_directory>")
-	}
-
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Error getting working directory: %s", err)
 	}
-
-	targetDir := os.Args[1]
-
-	cargoTomlPath := filepath.Join(wd, targetDir, "Cargo.toml")
-	if _, err = os.Stat(cargoTomlPath); err != nil {
-		log.Fatalf("Error checking for Cargo.toml: %s", err)
-	}
-	log.Printf("Cargo.toml found in %s", targetDir)
 
 	branch, err := getGitBranch(wd)
 	if err != nil {
@@ -222,21 +210,27 @@ func main() {
 
 		// Bazel query removed: no longer verifying //... in the worktree.
 
-		// Invoke files-to-prompt and then LLM to generate BUILD.bazel contents for this model/worktree
+		// For each target, invoke aider in the worktree so the model can make
+		// minimal Bazel changes to build the target.
 		llmModel := "openrouter/" + model
-		ftpOut, err := runFilesToPrompt(worktreePath, targetDir)
-		if err != nil {
-			log.Fatalf("files-to-prompt failed for %s: %s", worktreePath, err)
+		for _, target := range targets {
+			aiderCmd := exec.Command(
+				"aider",
+				"--disable-playwright",
+				"--yes-always",
+				"--model", llmModel,
+				"--edit-format", "diff",
+				"--auto-test",
+				"--test-cmd", "bazel build "+target,
+				"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
+			)
+			aiderCmd.Dir = worktreePath
+			aiderCmd.Stdout = os.Stdout
+			aiderCmd.Stderr = os.Stderr
+			if err := aiderCmd.Run(); err != nil {
+				log.Fatalf("aider failed for model %s target %s: %v", llmModel, target, err)
+			}
+			log.Printf("aider succeeded for model %s target %s", llmModel, target)
 		}
-		llmOut, err := runLLM(llmModel, targetDir, ftpOut)
-		if err != nil {
-			log.Fatalf("LLM invocation failed for model %s: %s", llmModel, err)
-		}
-		// Write LLM output to BUILD.bazel in the target directory of this worktree
-		buildFilePath := filepath.Join(worktreePath, targetDir, "BUILD.bazel")
-		if err := os.WriteFile(buildFilePath, []byte(llmOut+"\n"), 0644); err != nil {
-			log.Fatalf("Failed writing BUILD.bazel for model %s to %s: %v", llmModel, buildFilePath, err)
-		}
-		log.Printf("Wrote BUILD.bazel for %s to %s", llmModel, buildFilePath)
 	}
 }
