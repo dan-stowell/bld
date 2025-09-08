@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var models = []string{
@@ -147,7 +149,7 @@ func createGitWorktreeIfNotExists(repoDir, worktreePath, branchName string) erro
 
 func humanLogInvoke(model, target string, attempt int, cmd *exec.Cmd) {
 	bin := cmd.Args[0]
-	fmt.Fprintf(os.Stderr, "model=%s target=%s attempt=%d invoked=%s\n", model, target, attempt, filepath.Base(bin))
+	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d invoked=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, filepath.Base(bin))
 }
 
 func humanLogComplete(model, target string, attempt int, cmd *exec.Cmd, err error) {
@@ -156,7 +158,7 @@ func humanLogComplete(model, target string, attempt int, cmd *exec.Cmd, err erro
 	if err != nil {
 		status = "err"
 	}
-	fmt.Fprintf(os.Stderr, "model=%s target=%s attempt=%d completed=%s status=%s\n", model, target, attempt, filepath.Base(bin), status)
+	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d completed=%s status=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, filepath.Base(bin), status)
 }
 
 func runLLM(model, targetDir string, stdin string) (string, error) {
@@ -299,8 +301,8 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 			buildArg,
 		)
 		aiderCmd.Dir = worktreePath
-		aiderCmd.Stdout = os.Stdout
-		aiderCmd.Stderr = os.Stderr
+		aiderCmd.Stdout = io.Discard
+		aiderCmd.Stderr = io.Discard
 		humanLogInvoke(llmModel, target, attempt, aiderCmd)
 		if err := aiderCmd.Run(); err != nil {
 			humanLogComplete(llmModel, target, attempt, aiderCmd, err)
@@ -365,8 +367,8 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 			commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
 			commitCmd := exec.Command("git", "commit", "-m", commitMsg)
 			commitCmd.Dir = worktreePath
-			commitCmd.Stdout = os.Stdout
-			commitCmd.Stderr = os.Stderr
+			commitCmd.Stdout = io.Discard
+			commitCmd.Stderr = io.Discard
 			humanLogInvoke(llmModel, target, attempt, commitCmd)
 			if err := commitCmd.Run(); err != nil {
 				humanLogComplete(llmModel, target, attempt, commitCmd, err)
