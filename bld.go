@@ -88,9 +88,11 @@ func addGitWorktree(repoDir, worktreePath, branchName string) error {
 }
 
 func runLLM(model, targetDir string) (string, error) {
-	prompt := "Please write the minimal BUILD.bazel file with a single target for the crate under $TARGET_DIR. Output just the BUILD.bazel contents."
-	cmd := exec.Command("llm", "-m", model, prompt)
-	cmd.Env = append(os.Environ(), "TARGET_DIR="+targetDir)
+	prompt := fmt.Sprintf(
+		"Please write the minimal BUILD.bazel file with a single target for the crate under %s. Output just the BUILD.bazel contents.",
+		targetDir
+	)
+	cmd := exec.Command("llm", "-x", "-m", model, "-s", prompt)
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -186,12 +188,9 @@ func main() {
 
 		// Invoke LLM to generate BUILD.bazel contents for this model/worktree
 		llmModel := "openrouter/" + model
-		targetDirAbs := filepath.Join(worktreePath, targetDir)
-		llmOut, err := runLLM(llmModel, targetDirAbs)
+		llmOut, err := runLLM(llmModel, targetDir)
 		if err != nil {
-			log.Printf("LLM invocation failed for model %s: %v", llmModel, err)
-		} else {
-			log.Printf("LLM output for %s:\n%s", llmModel, llmOut)
+			log.Fatalf("LLM invocation failed for model %s: %s", llmModel, err)
 		}
 	}
 }
