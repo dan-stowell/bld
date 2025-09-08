@@ -70,7 +70,7 @@ func gitBranchExists(dir, branchName string) (bool, error) {
 	return true, nil // Branch exists
 }
 
- // createGitBranch creates a new git branch.
+// createGitBranch creates a new git branch.
 func createGitBranch(dir, branchName string) error {
 	cmd := exec.Command("git", "branch", branchName)
 	cmd.Dir = dir
@@ -113,7 +113,7 @@ func gitWorktreeExists(worktreePath string) (bool, error) {
 	return false, fmt.Errorf("failed to check worktree existence at %s: %w", worktreePath, err)
 }
 
- // addGitWorktree adds a new git worktree.
+// addGitWorktree adds a new git worktree.
 func addGitWorktree(repoDir, worktreePath, branchName string) error {
 	cmd := exec.Command("git", "worktree", "add", worktreePath, branchName)
 	cmd.Dir = repoDir
@@ -191,7 +191,6 @@ func main() {
 		log.Fatalf("Error checking for Cargo.toml: %s", err)
 	}
 	log.Printf("Cargo.toml found in %s", targetDir)
-
 
 	branch, err := getGitBranch(wd)
 	if err != nil {
