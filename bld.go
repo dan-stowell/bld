@@ -87,12 +87,13 @@ func addGitWorktree(repoDir, worktreePath, branchName string) error {
 	return nil
 }
 
-func runLLM(model, targetDir string) (string, error) {
+func runLLM(model, targetDir string, stdin string) (string, error) {
 	prompt := fmt.Sprintf(
 		"Please write the minimal BUILD.bazel file with a single target for the crate under %s. Output just the BUILD.bazel contents.",
-		targetDir
+		targetDir,
 	)
 	cmd := exec.Command("llm", "-x", "-m", model, "-s", prompt)
+	cmd.Stdin = strings.NewReader(stdin)
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -101,6 +102,19 @@ func runLLM(model, targetDir string) (string, error) {
 		return "", fmt.Errorf("llm failed: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func runFilesToPrompt(worktreePath, targetDir string) (string, error) {
+	cmd := exec.Command("files-to-prompt", "MODULE.bazel", filepath.Join(targetDir, "Cargo.toml"))
+	cmd.Dir = worktreePath
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("files-to-prompt failed: %w\n%s", err, string(ee.Stderr))
+		}
+		return "", fmt.Errorf("files-to-prompt failed: %w", err)
+	}
+	return string(out), nil
 }
 
 func main() {
@@ -186,9 +200,13 @@ func main() {
 		}
 		log.Printf("`bazel query //...` in %s succeeded and produced no targets.", worktreePath)
 
-		// Invoke LLM to generate BUILD.bazel contents for this model/worktree
+		// Invoke files-to-prompt and then LLM to generate BUILD.bazel contents for this model/worktree
 		llmModel := "openrouter/" + model
-		llmOut, err := runLLM(llmModel, targetDir)
+		ftpOut, err := runFilesToPrompt(worktreePath, targetDir)
+		if err != nil {
+			log.Fatalf("files-to-prompt failed for %s: %s", worktreePath, err)
+		}
+		llmOut, err := runLLM(llmModel, targetDir, ftpOut)
 		if err != nil {
 			log.Fatalf("LLM invocation failed for model %s: %s", llmModel, err)
 		}
