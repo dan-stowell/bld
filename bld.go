@@ -23,6 +23,21 @@ var models = []string{
 	"x-ai/grok-4",
 }
 
+var targets = []string{
+	"//crates/matcher:grep_matcher",
+	"//crates/matcher:integration_test",
+	"//crates/globset:globset",
+	"//crates/cli:grep_cli",
+	"//crates/regex:grep_regex",
+	"//crates/searcher:grep_searcher",
+	"//crates/pcre2:grep_pcre2",
+	"//crates/ignore:ignore",
+	"//crates/printer:grep_printer",
+	"//crates/grep:grep",
+	"//:ripgrep",
+	"//:integration_test",
+}
+
 // sanitizePath replaces characters that are unsafe in file paths with hyphens.
 func sanitizePath(s string) string {
 	s = strings.ReplaceAll(s, "/", "-")
@@ -89,7 +104,7 @@ func addGitWorktree(repoDir, worktreePath, branchName string) error {
 
 func runLLM(model, targetDir string, stdin string) (string, error) {
 	prompt := fmt.Sprintf(
-		"Please write the minimal BUILD.bazel file with a single target for the crate under %s. Output just the BUILD.bazel contents.",
+		"Please write the minimal BUILD.bazel file with a single target for the crate under %s. Output just the BUILD.bazel contents. Including MODULE.bazel and the Cargo.toml for the crate.",
 		targetDir,
 	)
 	cmd := exec.Command("llm", "-x", "-m", model, "-s", prompt)
