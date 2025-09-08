@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -144,6 +145,20 @@ func createGitWorktreeIfNotExists(repoDir, worktreePath, branchName string) erro
 	return nil
 }
 
+func humanLogInvoke(model, target string, attempt int, cmd *exec.Cmd) {
+	bin := cmd.Args[0]
+	fmt.Fprintf(os.Stderr, "model=%s target=%s attempt=%d invoked=%s\n", model, target, attempt, filepath.Base(bin))
+}
+
+func humanLogComplete(model, target string, attempt int, cmd *exec.Cmd, err error) {
+	bin := cmd.Args[0]
+	status := "ok"
+	if err != nil {
+		status = "err"
+	}
+	fmt.Fprintf(os.Stderr, "model=%s target=%s attempt=%d completed=%s status=%s\n", model, target, attempt, filepath.Base(bin), status)
+}
+
 func runLLM(model, targetDir string, stdin string) (string, error) {
 	prompt := fmt.Sprintf(
 		"Please write the minimal BUILD.bazel file with a single target for the crate under %s. Output just the BUILD.bazel contents. Including MODULE.bazel and the Cargo.toml for the crate.",
@@ -210,12 +225,14 @@ func ensureBuildBazelExists(worktreePath, target string) error {
 	return nil
 }
 
-func gitStashAll(worktreePath, target string) error {
+func gitStashAll(worktreePath, model, target string, attempt int) error {
 	// Stash untracked and dirty files so the next aider invocation starts clean.
 	stashMsg := fmt.Sprintf("aider-temp-stash target %s", target)
 	stashCmd := exec.Command("git", "stash", "push", "-u", "-m", stashMsg)
 	stashCmd.Dir = worktreePath
+	humanLogInvoke(model, target, attempt, stashCmd)
 	out, err := stashCmd.CombinedOutput()
+	humanLogComplete(model, target, attempt, stashCmd, err)
 	if err != nil {
 		return fmt.Errorf("git stash failed in %s: %v\n%s", worktreePath, err, string(out))
 	}
@@ -246,12 +263,16 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 	// Pre-check: If bazel query then bazel build succeed without changes, return success.
 	queryCmd := exec.Command("bazel", "query", target)
 	queryCmd.Dir = worktreePath
+	humanLogInvoke(llmModel, target, 0, queryCmd)
 	queryOut, queryErr := queryCmd.CombinedOutput()
+	humanLogComplete(llmModel, target, 0, queryCmd, queryErr)
 	if queryErr == nil {
 		// Query succeeded; try building directly.
 		bazelCmd := exec.Command("bazel", "build", target)
 		bazelCmd.Dir = worktreePath
+		humanLogInvoke(llmModel, target, 0, bazelCmd)
 		bazelOut, bazelErr := bazelCmd.CombinedOutput()
+		humanLogComplete(llmModel, target, 0, bazelCmd, bazelErr)
 		if bazelErr == nil {
 			log.Printf("bazel query and build succeeded for model %s target %s; skipping aider", llmModel, target)
 			return true, nil
@@ -280,19 +301,24 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 		aiderCmd.Dir = worktreePath
 		aiderCmd.Stdout = os.Stdout
 		aiderCmd.Stderr = os.Stderr
+		humanLogInvoke(llmModel, target, attempt, aiderCmd)
 		if err := aiderCmd.Run(); err != nil {
+			humanLogComplete(llmModel, target, attempt, aiderCmd, err)
 			return false, fmt.Errorf("aider failed for model %s target %s: %w", llmModel, target, err)
 		}
+		humanLogComplete(llmModel, target, attempt, aiderCmd, nil)
 		log.Printf("aider completed for model %s target %s (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
 
 		// After aider, first run 'bazel query' to check target visibility/resolution.
 		queryCmd := exec.Command("bazel", "query", target)
 		queryCmd.Dir = worktreePath
+		humanLogInvoke(llmModel, target, attempt, queryCmd)
 		queryOut, queryErr := queryCmd.CombinedOutput()
+		humanLogComplete(llmModel, target, attempt, queryCmd, queryErr)
 		if queryErr != nil {
 			log.Printf("bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
 			// Stash any untracked or dirty files and retry with aider.
-			if err := gitStashAll(worktreePath, target); err != nil {
+			if err := gitStashAll(worktreePath, llmModel, target, attempt); err != nil {
 				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
 			}
 			log.Printf("Re-invoking aider for model %s target %s after failed bazel query (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
@@ -302,11 +328,13 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 		// Query succeeded; attempt to build the target.
 		bazelCmd := exec.Command("bazel", "build", target)
 		bazelCmd.Dir = worktreePath
+		humanLogInvoke(llmModel, target, attempt, bazelCmd)
 		bazelOut, bazelErr := bazelCmd.CombinedOutput()
+		humanLogComplete(llmModel, target, attempt, bazelCmd, bazelErr)
 		if bazelErr != nil {
 			log.Printf("bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
 			// Stash any untracked or dirty files and retry with aider.
-			if err := gitStashAll(worktreePath, target); err != nil {
+			if err := gitStashAll(worktreePath, llmModel, target, attempt); err != nil {
 				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
 			}
 			log.Printf("Re-invoking aider for model %s target %s after failed bazel build (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
@@ -316,13 +344,18 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 		// Bazel build succeeded. Commit any untracked or dirty files and return success.
 		addCmd := exec.Command("git", "add", "-A")
 		addCmd.Dir = worktreePath
-		if out, err := addCmd.CombinedOutput(); err != nil {
+		humanLogInvoke(llmModel, target, attempt, addCmd)
+		out, err := addCmd.CombinedOutput()
+		humanLogComplete(llmModel, target, attempt, addCmd, err)
+		if err != nil {
 			return false, fmt.Errorf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
 		}
 
 		statusCmd := exec.Command("git", "status", "--porcelain")
 		statusCmd.Dir = worktreePath
+		humanLogInvoke(llmModel, target, attempt, statusCmd)
 		statusOut, err := statusCmd.Output()
+		humanLogComplete(llmModel, target, attempt, statusCmd, err)
 		if err != nil {
 			return false, fmt.Errorf("git status failed in %s: %w", worktreePath, err)
 		}
@@ -334,9 +367,12 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 			commitCmd.Dir = worktreePath
 			commitCmd.Stdout = os.Stdout
 			commitCmd.Stderr = os.Stderr
+			humanLogInvoke(llmModel, target, attempt, commitCmd)
 			if err := commitCmd.Run(); err != nil {
+				humanLogComplete(llmModel, target, attempt, commitCmd, err)
 				return false, fmt.Errorf("git commit failed in %s: %w", worktreePath, err)
 			}
+			humanLogComplete(llmModel, target, attempt, commitCmd, nil)
 			log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
 		}
 
@@ -348,6 +384,18 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 }
 
 func main() {
+	logPath := flag.String("log", "bld.log", "path to detailed log file")
+	flag.Parse()
+
+	f, err := os.OpenFile(*logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		log.SetOutput(f)
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+		defer f.Close()
+	} else {
+		log.Printf("Warning: could not open log file %s: %v; logging to stderr", *logPath, err)
+	}
+
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Error getting working directory: %s", err)
