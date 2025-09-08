@@ -301,8 +301,8 @@ func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
 			buildArg,
 		)
 		aiderCmd.Dir = worktreePath
-		aiderCmd.Stdout = io.Discard
-		aiderCmd.Stderr = io.Discard
+		aiderCmd.Stdout = log.Default().Writer()
+		aiderCmd.Stderr = log.Default().Writer()
 		humanLogInvoke(llmModel, target, attempt, aiderCmd)
 		if err := aiderCmd.Run(); err != nil {
 			humanLogComplete(llmModel, target, attempt, aiderCmd, err)
