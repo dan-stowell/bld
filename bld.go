@@ -70,13 +70,34 @@ func gitBranchExists(dir, branchName string) (bool, error) {
 	return true, nil // Branch exists
 }
 
-// createGitBranch creates a new git branch.
+ // createGitBranch creates a new git branch.
 func createGitBranch(dir, branchName string) error {
 	cmd := exec.Command("git", "branch", branchName)
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create branch %s: %w", branchName, err)
 	}
+	return nil
+}
+
+// createGitBranchIfNotExists ensures the given branch exists in the repo at dir.
+// If the branch does not exist it will be created. The function logs progress
+// similarly to the previous inline behavior.
+func createGitBranchIfNotExists(dir, branchName string) error {
+	exists, err := gitBranchExists(dir, branchName)
+	if err != nil {
+		return fmt.Errorf("failed to check if branch %s exists: %w", branchName, err)
+	}
+	if exists {
+		log.Printf("Branch %s already exists.", branchName)
+		return nil
+	}
+
+	log.Printf("Branch %s does not exist, creating...", branchName)
+	if err := createGitBranch(dir, branchName); err != nil {
+		return fmt.Errorf("failed to create branch %s: %w", branchName, err)
+	}
+	log.Printf("Branch %s created.", branchName)
 	return nil
 }
 
@@ -169,19 +190,9 @@ func main() {
 		modelBranch := branch + "-" + sanitizedModelName
 		worktreePath := filepath.Join(worktreeBaseDir, modelBranch)
 
-		// Check and create branch
-		exists, err := gitBranchExists(wd, modelBranch)
-		if err != nil {
-			log.Fatalf("Error checking branch %s: %s", modelBranch, err)
-		}
-		if !exists {
-			log.Printf("Branch %s does not exist, creating...", modelBranch)
-			if err := createGitBranch(wd, modelBranch); err != nil {
-				log.Fatalf("Error creating branch %s: %s", modelBranch, err)
-			}
-			log.Printf("Branch %s created.", modelBranch)
-		} else {
-			log.Printf("Branch %s already exists.", modelBranch)
+		// Ensure branch exists (create if needed)
+		if err := createGitBranchIfNotExists(wd, modelBranch); err != nil {
+			log.Fatalf("Error ensuring branch %s exists: %s", modelBranch, err)
 		}
 
 		// Check and create worktree
