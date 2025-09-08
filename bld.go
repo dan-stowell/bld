@@ -147,18 +147,42 @@ func createGitWorktreeIfNotExists(repoDir, worktreePath, branchName string) erro
 	return nil
 }
 
+func commandLabel(cmd *exec.Cmd) string {
+	if cmd == nil || len(cmd.Args) == 0 {
+		return ""
+	}
+	base := filepath.Base(cmd.Args[0])
+	if base == "bazel" && len(cmd.Args) > 1 {
+		switch cmd.Args[1] {
+		case "build":
+			return "bazel-build"
+		case "query":
+			return "bazel-query"
+		}
+	}
+	if base == "git" && len(cmd.Args) > 1 {
+		switch cmd.Args[1] {
+		case "commit":
+			return "git-commit"
+		case "stash":
+			return "git-stash"
+		}
+	}
+	return base
+}
+
 func humanLogInvoke(model, target string, attempt int, cmd *exec.Cmd) {
-	bin := cmd.Args[0]
-	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d invoked=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, filepath.Base(bin))
+	label := commandLabel(cmd)
+	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d invoked=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, label)
 }
 
 func humanLogComplete(model, target string, attempt int, cmd *exec.Cmd, err error) {
-	bin := cmd.Args[0]
+	label := commandLabel(cmd)
 	status := "ok"
 	if err != nil {
 		status = "err"
 	}
-	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d completed=%s status=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, filepath.Base(bin), status)
+	fmt.Fprintf(os.Stderr, "%s model=%s target=%s attempt=%d completed=%s status=%s\n", time.Now().Format(time.RFC3339Nano), model, target, attempt, label, status)
 }
 
 func runLLM(model, targetDir string, stdin string) (string, error) {
