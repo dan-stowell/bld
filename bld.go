@@ -278,7 +278,27 @@ func main() {
 			} else {
 				buildArg = filepath.Join(pkg, "BUILD.bazel")
 			}
-			// Try up to N attempts per model/target.
+			// Pre-check: If bazel query then bazel build succeed without changes, skip aider.
+			queryCmd := exec.Command("bazel", "query", target)
+			queryCmd.Dir = worktreePath
+			queryOut, queryErr := queryCmd.CombinedOutput()
+			if queryErr == nil {
+				// Query succeeded; try building directly.
+				bazelCmd := exec.Command("bazel", "build", target)
+				bazelCmd.Dir = worktreePath
+				bazelOut, bazelErr := bazelCmd.CombinedOutput()
+				if bazelErr == nil {
+					log.Printf("bazel query and build succeeded for model %s target %s; skipping aider", llmModel, target)
+					continue // move to next target
+				}
+				log.Printf("Pre-check bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
+				// Fall through to aider loop to attempt fixes.
+			} else {
+				log.Printf("Pre-check bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
+				// Fall through to aider loop to attempt fixes.
+			}
+
+			// Try up to N attempts per model/target using aider to produce Bazel changes.
 			const maxAttempts = 5
 			success := false
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
