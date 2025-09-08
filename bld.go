@@ -87,6 +87,20 @@ func addGitWorktree(repoDir, worktreePath, branchName string) error {
 	return nil
 }
 
+func runLLM(model, targetDir string) (string, error) {
+	prompt := "Please write the minimal BUILD.bazel file with a single target for the crate under $TARGET_DIR. Output just the BUILD.bazel contents."
+	cmd := exec.Command("llm", "-m", model, prompt)
+	cmd.Env = append(os.Environ(), "TARGET_DIR="+targetDir)
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("llm failed: %w\n%s", err, string(ee.Stderr))
+		}
+		return "", fmt.Errorf("llm failed: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: bld <target_directory>")
@@ -169,5 +183,15 @@ func main() {
 			log.Fatalf("`bazel query //...` in %s produced targets on stdout; expected none.\n%s", worktreePath, out)
 		}
 		log.Printf("`bazel query //...` in %s succeeded and produced no targets.", worktreePath)
+
+		// Invoke LLM to generate BUILD.bazel contents for this model/worktree
+		llmModel := "openrouter/" + model
+		targetDirAbs := filepath.Join(worktreePath, targetDir)
+		llmOut, err := runLLM(llmModel, targetDirAbs)
+		if err != nil {
+			log.Printf("LLM invocation failed for model %s: %v", llmModel, err)
+		} else {
+			log.Printf("LLM output for %s:\n%s", llmModel, llmOut)
+		}
 	}
 }
