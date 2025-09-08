@@ -113,13 +113,34 @@ func gitWorktreeExists(worktreePath string) (bool, error) {
 	return false, fmt.Errorf("failed to check worktree existence at %s: %w", worktreePath, err)
 }
 
-// addGitWorktree adds a new git worktree.
+ // addGitWorktree adds a new git worktree.
 func addGitWorktree(repoDir, worktreePath, branchName string) error {
 	cmd := exec.Command("git", "worktree", "add", worktreePath, branchName)
 	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to add worktree at %s for branch %s: %w", worktreePath, branchName, err)
 	}
+	return nil
+}
+
+// createGitWorktreeIfNotExists ensures the given worktree exists at worktreePath.
+// If the worktree does not exist it will be created. The function logs progress
+// similarly to the previous inline behavior.
+func createGitWorktreeIfNotExists(repoDir, worktreePath, branchName string) error {
+	exists, err := gitWorktreeExists(worktreePath)
+	if err != nil {
+		return fmt.Errorf("failed to check if worktree %s exists: %w", worktreePath, err)
+	}
+	if exists {
+		log.Printf("Worktree already exists at: %s", worktreePath)
+		return nil
+	}
+
+	log.Printf("Worktree at %s does not exist, creating...", worktreePath)
+	if err := addGitWorktree(repoDir, worktreePath, branchName); err != nil {
+		return fmt.Errorf("failed to add worktree at %s for branch %s: %w", worktreePath, branchName, err)
+	}
+	log.Printf("Worktree created at: %s", worktreePath)
 	return nil
 }
 
@@ -195,19 +216,9 @@ func main() {
 			log.Fatalf("Error ensuring branch %s exists: %s", modelBranch, err)
 		}
 
-		// Check and create worktree
-		wtExists, err := gitWorktreeExists(worktreePath)
-		if err != nil {
-			log.Fatalf("Error checking worktree at %s: %s", worktreePath, err)
-		}
-		if !wtExists {
-			log.Printf("Worktree at %s does not exist, creating...", worktreePath)
-			if err := addGitWorktree(wd, worktreePath, modelBranch); err != nil {
-				log.Fatalf("Error adding worktree at %s: %s", worktreePath, err)
-			}
-			log.Printf("Worktree created at: %s", worktreePath)
-		} else {
-			log.Printf("Worktree already exists at: %s", worktreePath)
+		// Ensure worktree exists (create if needed)
+		if err := createGitWorktreeIfNotExists(wd, worktreePath, modelBranch); err != nil {
+			log.Fatalf("Error ensuring worktree at %s exists: %s", worktreePath, err)
 		}
 
 		// Run `bazel query //...` in the worktree and assert success with no output
