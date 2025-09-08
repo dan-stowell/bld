@@ -224,6 +224,127 @@ func gitStashAll(worktreePath string) error {
 	return nil
 }
 
+func makeTargetBuild(worktreePath, llmModel, target string) (bool, error) {
+	// Ensure BUILD.bazel exists for the target package.
+	if err := ensureBuildBazelExists(worktreePath, target); err != nil {
+		return false, fmt.Errorf("ensuring BUILD.bazel for target %s: %w", target, err)
+	}
+
+	// Determine the BUILD.bazel path for the target to pass to aider.
+	pkg := strings.TrimPrefix(target, "//")
+	if idx := strings.Index(pkg, ":"); idx != -1 {
+		pkg = pkg[:idx]
+	}
+	var buildArg string
+	if pkg == "" {
+		buildArg = "BUILD.bazel"
+	} else {
+		buildArg = filepath.Join(pkg, "BUILD.bazel")
+	}
+
+	// Pre-check: If bazel query then bazel build succeed without changes, return success.
+	queryCmd := exec.Command("bazel", "query", target)
+	queryCmd.Dir = worktreePath
+	queryOut, queryErr := queryCmd.CombinedOutput()
+	if queryErr == nil {
+		// Query succeeded; try building directly.
+		bazelCmd := exec.Command("bazel", "build", target)
+		bazelCmd.Dir = worktreePath
+		bazelOut, bazelErr := bazelCmd.CombinedOutput()
+		if bazelErr == nil {
+			log.Printf("bazel query and build succeeded for model %s target %s; skipping aider", llmModel, target)
+			return true, nil
+		}
+		log.Printf("Pre-check bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
+	} else {
+		log.Printf("Pre-check bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
+	}
+
+	// Try up to N attempts per model/target using aider to produce Bazel changes.
+	const maxAttempts = 5
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		aiderCmd := exec.Command(
+			"aider",
+			"--disable-playwright",
+			"--yes-always",
+			"--model", llmModel,
+			"--edit-format", "diff",
+			"--auto-test",
+			"--test-cmd", "bazel build "+target,
+			"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
+			"MODULE.bazel",
+			buildArg,
+		)
+		aiderCmd.Dir = worktreePath
+		aiderCmd.Stdout = os.Stdout
+		aiderCmd.Stderr = os.Stderr
+		if err := aiderCmd.Run(); err != nil {
+			return false, fmt.Errorf("aider failed for model %s target %s: %w", llmModel, target, err)
+		}
+		log.Printf("aider completed for model %s target %s (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
+
+		// After aider, first run 'bazel query' to check target visibility/resolution.
+		queryCmd := exec.Command("bazel", "query", target)
+		queryCmd.Dir = worktreePath
+		queryOut, queryErr := queryCmd.CombinedOutput()
+		if queryErr != nil {
+			log.Printf("bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
+			// Stash any untracked or dirty files and retry with aider.
+			if err := gitStashAll(worktreePath); err != nil {
+				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
+			}
+			log.Printf("Re-invoking aider for model %s target %s after failed bazel query (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
+			continue
+		}
+
+		// Query succeeded; attempt to build the target.
+		bazelCmd := exec.Command("bazel", "build", target)
+		bazelCmd.Dir = worktreePath
+		bazelOut, bazelErr := bazelCmd.CombinedOutput()
+		if bazelErr != nil {
+			log.Printf("bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
+			// Stash any untracked or dirty files and retry with aider.
+			if err := gitStashAll(worktreePath); err != nil {
+				return false, fmt.Errorf("git stash failed in %s: %w", worktreePath, err)
+			}
+			log.Printf("Re-invoking aider for model %s target %s after failed bazel build (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
+			continue
+		}
+
+		// Bazel build succeeded. Commit any untracked or dirty files and return success.
+		addCmd := exec.Command("git", "add", "-A")
+		addCmd.Dir = worktreePath
+		if out, err := addCmd.CombinedOutput(); err != nil {
+			return false, fmt.Errorf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
+		}
+
+		statusCmd := exec.Command("git", "status", "--porcelain")
+		statusCmd.Dir = worktreePath
+		statusOut, err := statusCmd.Output()
+		if err != nil {
+			return false, fmt.Errorf("git status failed in %s: %w", worktreePath, err)
+		}
+		if strings.TrimSpace(string(statusOut)) == "" {
+			log.Printf("No changes to commit in %s for model %s target %s", worktreePath, llmModel, target)
+		} else {
+			commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
+			commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+			commitCmd.Dir = worktreePath
+			commitCmd.Stdout = os.Stdout
+			commitCmd.Stderr = os.Stderr
+			if err := commitCmd.Run(); err != nil {
+				return false, fmt.Errorf("git commit failed in %s: %w", worktreePath, err)
+			}
+			log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
+		}
+
+		log.Printf("bazel build succeeded for model %s target %s", llmModel, target)
+		return true, nil
+	}
+
+	return false, fmt.Errorf("maximum attempts (%d) reached for model %s target %s", maxAttempts, llmModel, target)
+}
+
 func main() {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -264,125 +385,14 @@ func main() {
 		// minimal Bazel changes to build the target.
 		llmModel := "openrouter/" + model
 		for _, target := range targets {
-			if err := ensureBuildBazelExists(worktreePath, target); err != nil {
-				log.Fatalf("Error ensuring BUILD.bazel for target %s: %v", target, err)
-			}
-			// determine the BUILD.bazel path for the target to pass to aider
-			pkg := strings.TrimPrefix(target, "//")
-			if idx := strings.Index(pkg, ":"); idx != -1 {
-				pkg = pkg[:idx]
-			}
-			var buildArg string
-			if pkg == "" {
-				buildArg = "BUILD.bazel"
-			} else {
-				buildArg = filepath.Join(pkg, "BUILD.bazel")
-			}
-			// Pre-check: If bazel query then bazel build succeed without changes, skip aider.
-			queryCmd := exec.Command("bazel", "query", target)
-			queryCmd.Dir = worktreePath
-			queryOut, queryErr := queryCmd.CombinedOutput()
-			if queryErr == nil {
-				// Query succeeded; try building directly.
-				bazelCmd := exec.Command("bazel", "build", target)
-				bazelCmd.Dir = worktreePath
-				bazelOut, bazelErr := bazelCmd.CombinedOutput()
-				if bazelErr == nil {
-					log.Printf("bazel query and build succeeded for model %s target %s; skipping aider", llmModel, target)
-					continue // move to next target
-				}
-				log.Printf("Pre-check bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
-				// Fall through to aider loop to attempt fixes.
-			} else {
-				log.Printf("Pre-check bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
-				// Fall through to aider loop to attempt fixes.
-			}
-
-			// Try up to N attempts per model/target using aider to produce Bazel changes.
-			const maxAttempts = 5
-			success := false
-			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				aiderCmd := exec.Command(
-					"aider",
-					"--disable-playwright",
-					"--yes-always",
-					"--model", llmModel,
-					"--edit-format", "diff",
-					"--auto-test",
-					"--test-cmd", "bazel build "+target,
-					"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
-					"MODULE.bazel",
-					buildArg,
-				)
-				aiderCmd.Dir = worktreePath
-				aiderCmd.Stdout = os.Stdout
-				aiderCmd.Stderr = os.Stderr
-				if err := aiderCmd.Run(); err != nil {
-					log.Fatalf("aider failed for model %s target %s: %v", llmModel, target, err)
-				}
-				log.Printf("aider completed for model %s target %s (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
-
-				// After aider, first run 'bazel query' to check target visibility/resolution.
-				queryCmd := exec.Command("bazel", "query", target)
-				queryCmd.Dir = worktreePath
-				queryOut, queryErr := queryCmd.CombinedOutput()
-				if queryErr != nil {
-					log.Printf("bazel query failed for model %s target %s: %v\n%s", llmModel, target, queryErr, string(queryOut))
-					// Stash any untracked or dirty files and retry with aider.
-					if err := gitStashAll(worktreePath); err != nil {
-						log.Fatalf("git stash failed in %s: %v", worktreePath, err)
-					}
-					log.Printf("Re-invoking aider for model %s target %s after failed bazel query (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
-					continue
-				}
-
-				// Query succeeded; attempt to build the target.
-				bazelCmd := exec.Command("bazel", "build", target)
-				bazelCmd.Dir = worktreePath
-				bazelOut, bazelErr := bazelCmd.CombinedOutput()
-				if bazelErr != nil {
-					log.Printf("bazel build failed for model %s target %s: %v\n%s", llmModel, target, bazelErr, string(bazelOut))
-					// Stash any untracked or dirty files and retry with aider.
-					if err := gitStashAll(worktreePath); err != nil {
-						log.Fatalf("git stash failed in %s: %v", worktreePath, err)
-					}
-					log.Printf("Re-invoking aider for model %s target %s after failed bazel build (attempt %d/%d)", llmModel, target, attempt, maxAttempts)
-					continue
-				}
-
-				// Bazel build succeeded. Commit any untracked or dirty files and move on.
-				addCmd := exec.Command("git", "add", "-A")
-				addCmd.Dir = worktreePath
-				if out, err := addCmd.CombinedOutput(); err != nil {
-					log.Fatalf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
-				}
-
-				statusCmd := exec.Command("git", "status", "--porcelain")
-				statusCmd.Dir = worktreePath
-				statusOut, err := statusCmd.Output()
+			success, err := makeTargetBuild(worktreePath, llmModel, target)
+			if err != nil || !success {
 				if err != nil {
-					log.Fatalf("git status failed in %s: %v", worktreePath, err)
-				}
-				if strings.TrimSpace(string(statusOut)) == "" {
-					log.Printf("No changes to commit in %s for model %s target %s", worktreePath, llmModel, target)
+					log.Printf("makeTargetBuild failed for model %s target %s: %v; moving to next model/worktree", llmModel, target, err)
 				} else {
-					commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
-					commitCmd := exec.Command("git", "commit", "-m", commitMsg)
-					commitCmd.Dir = worktreePath
-					commitCmd.Stdout = os.Stdout
-					commitCmd.Stderr = os.Stderr
-					if err := commitCmd.Run(); err != nil {
-						log.Fatalf("git commit failed in %s: %v", worktreePath, err)
-					}
-					log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
+					log.Printf("makeTargetBuild did not succeed for model %s target %s; moving to next model/worktree", llmModel, target)
 				}
-
-				log.Printf("bazel build succeeded for model %s target %s", llmModel, target)
-				success = true
-				break // move to next target
-			}
-			if !success {
-				log.Printf("Maximum attempts (%d) reached for model %s target %s; moving on to next target/worktree", maxAttempts, llmModel, target)
+				break
 			}
 		}
 	}
