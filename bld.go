@@ -192,5 +192,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("LLM invocation failed for model %s: %s", llmModel, err)
 		}
+		// Write LLM output to BUILD.bazel in the target directory of this worktree
+		buildFilePath := filepath.Join(worktreePath, targetDir, "BUILD.bazel")
+		if err := os.WriteFile(buildFilePath, []byte(llmOut+"\n"), 0644); err != nil {
+			log.Fatalf("Failed writing BUILD.bazel for model %s to %s: %v", llmModel, buildFilePath, err)
+		}
+		log.Printf("Wrote BUILD.bazel for %s to %s", llmModel, buildFilePath)
 	}
 }
