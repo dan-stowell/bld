@@ -221,21 +221,7 @@ func main() {
 			log.Fatalf("Error ensuring worktree at %s exists: %s", worktreePath, err)
 		}
 
-		// Run `bazel query //...` in the worktree and assert success with no output
-		bazelCmd := exec.Command("bazel", "query", "//...")
-		bazelCmd.Dir = worktreePath
-		stdout, err := bazelCmd.Output()
-		if err != nil {
-			var stderr string
-			if ee, ok := err.(*exec.ExitError); ok {
-				stderr = string(ee.Stderr)
-			}
-			log.Fatalf("`bazel query //...` failed in %s: %v\n%s", worktreePath, err, stderr)
-		}
-		if out := strings.TrimSpace(string(stdout)); out != "" {
-			log.Fatalf("`bazel query //...` in %s produced targets on stdout; expected none.\n%s", worktreePath, out)
-		}
-		log.Printf("`bazel query //...` in %s succeeded and produced no targets.", worktreePath)
+		// Bazel query removed: no longer verifying //... in the worktree.
 
 		// Invoke files-to-prompt and then LLM to generate BUILD.bazel contents for this model/worktree
 		llmModel := "openrouter/" + model
