@@ -157,5 +157,21 @@ func main() {
 		} else {
 			log.Printf("Worktree already exists at: %s", worktreePath)
 		}
+
+		// Run `bazel query //...` in the worktree and assert success with no output
+		bazelCmd := exec.Command("bazel", "query", "//...")
+		bazelCmd.Dir = worktreePath
+		stdout, err := bazelCmd.Output()
+		if err != nil {
+			var stderr string
+			if ee, ok := err.(*exec.ExitError); ok {
+				stderr = string(ee.Stderr)
+			}
+			log.Fatalf("`bazel query //...` failed in %s: %v\n%s", worktreePath, err, stderr)
+		}
+		if out := strings.TrimSpace(string(stdout)); out != "" {
+			log.Fatalf("`bazel query //...` in %s produced targets on stdout; expected none.\n%s", worktreePath, out)
+		}
+		log.Printf("`bazel query //...` in %s succeeded and produced no targets.", worktreePath)
 	}
 }
