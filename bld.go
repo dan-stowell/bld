@@ -174,6 +174,42 @@ func runFilesToPrompt(worktreePath, targetDir string) (string, error) {
 	return string(out), nil
 }
 
+func ensureBuildBazelExists(worktreePath, target string) error {
+	// Parse target like //path/to/pkg:target or //:target
+	if !strings.HasPrefix(target, "//") {
+		// not a package-style target; nothing to do
+		return nil
+	}
+	s := strings.TrimPrefix(target, "//")
+	pkg := s
+	if idx := strings.Index(s, ":"); idx != -1 {
+		pkg = s[:idx]
+	}
+	var pkgPath string
+	if pkg == "" {
+		pkgPath = ""
+	} else {
+		pkgPath = pkg
+	}
+	buildPath := filepath.Join(worktreePath, pkgPath, "BUILD.bazel")
+	if _, err := os.Stat(buildPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat %s: %w", buildPath, err)
+	}
+	dir := filepath.Dir(buildPath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create dir %s: %w", dir, err)
+		}
+	}
+	if err := os.WriteFile(buildPath, []byte("# created by bld.go\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", buildPath, err)
+	}
+	log.Printf("Created %s", buildPath)
+	return nil
+}
+
 func main() {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -214,6 +250,9 @@ func main() {
 		// minimal Bazel changes to build the target.
 		llmModel := "openrouter/" + model
 		for _, target := range targets {
+			if err := ensureBuildBazelExists(worktreePath, target); err != nil {
+				log.Fatalf("Error ensuring BUILD.bazel for target %s: %v", target, err)
+			}
 			for {
 				aiderCmd := exec.Command(
 					"aider",
