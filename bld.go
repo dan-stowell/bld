@@ -253,6 +253,17 @@ func main() {
 			if err := ensureBuildBazelExists(worktreePath, target); err != nil {
 				log.Fatalf("Error ensuring BUILD.bazel for target %s: %v", target, err)
 			}
+			// determine the BUILD.bazel path for the target to pass to aider
+			pkg := strings.TrimPrefix(target, "//")
+			if idx := strings.Index(pkg, ":"); idx != -1 {
+				pkg = pkg[:idx]
+			}
+			var buildArg string
+			if pkg == "" {
+				buildArg = "BUILD.bazel"
+			} else {
+				buildArg = filepath.Join(pkg, "BUILD.bazel")
+			}
 			for {
 				aiderCmd := exec.Command(
 					"aider",
@@ -263,6 +274,8 @@ func main() {
 					"--auto-test",
 					"--test-cmd", "bazel build "+target,
 					"--message", "Please make the minimal Bazel file changes necessary to build "+target+". Do not touch non-Bazel files.",
+					"MODULE.bazel",
+					buildArg,
 				)
 				aiderCmd.Dir = worktreePath
 				aiderCmd.Stdout = os.Stdout
