@@ -231,6 +231,36 @@ func main() {
 				log.Fatalf("aider failed for model %s target %s: %v", llmModel, target, err)
 			}
 			log.Printf("aider succeeded for model %s target %s", llmModel, target)
+
+			// Stage all changes produced by aider (including untracked files).
+			addCmd := exec.Command("git", "add", "-A")
+			addCmd.Dir = worktreePath
+			if out, err := addCmd.CombinedOutput(); err != nil {
+				log.Fatalf("git add failed in %s: %v\n%s", worktreePath, err, string(out))
+			}
+
+			// Check if there is anything to commit.
+			statusCmd := exec.Command("git", "status", "--porcelain")
+			statusCmd.Dir = worktreePath
+			statusOut, err := statusCmd.Output()
+			if err != nil {
+				log.Fatalf("git status failed in %s: %v", worktreePath, err)
+			}
+			if strings.TrimSpace(string(statusOut)) == "" {
+				log.Printf("No changes to commit in %s for model %s target %s", worktreePath, llmModel, target)
+				continue
+			}
+
+			// Commit staged changes.
+			commitMsg := fmt.Sprintf("aider: model %s target %s", llmModel, target)
+			commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+			commitCmd.Dir = worktreePath
+			commitCmd.Stdout = os.Stdout
+			commitCmd.Stderr = os.Stderr
+			if err := commitCmd.Run(); err != nil {
+				log.Fatalf("git commit failed in %s: %v", worktreePath, err)
+			}
+			log.Printf("Committed changes in %s: %s", worktreePath, commitMsg)
 		}
 	}
 }
