@@ -11,7 +11,6 @@ import (
 
 var models = []string{
 	// openrouter top 10 programming weekly as of 2025-09-08
-	"x-ai/grok-code-fast-1",
 	"anthropic/claude-sonnet-4",
 	"google/gemini-2.5-flash",
 	"openai/gpt-4.1-mini",
@@ -20,6 +19,7 @@ var models = []string{
 	"qwen/qwen3-coder",
 	"openrouter/sonoma-sky-alpha",
 	"deepseek/deepseek-chat-v3.1",
+	"x-ai/grok-code-fast-1",
 	"x-ai/grok-4",
 }
 
